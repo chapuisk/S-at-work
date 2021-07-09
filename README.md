@@ -1,5 +1,5 @@
 # S-at-work
-An agent based model of job satisfaction in work organization 
+An agent based model of job satisfaction in work organization
 
 
 <!-- TABLE OF CONTENTS -->
@@ -10,9 +10,8 @@ An agent based model of job satisfaction in work organization
 * [Launch Model Simulations](#launch-model-simulations)
   * [Prerequisites](#prerequisites)
   * [Getting started](#getting-started)
-* [Usage](#usage)
-* [Roadmap](#roadmap)
-* [Contributing](#contributing)
+* [Details](#details)
+* [Future development](#future-development)
 * [License](#license)
 
 
@@ -39,21 +38,64 @@ To get a local copy of the model and be able to run experiment with it, improve 
 
 2. Second, clone the model on your computer (in a terminal go to the desired repository and inpu ``git clone https://github.com/chapuisk/S-at-work.git``) or download the model [on GitHub](https://github.com/chapuisk/S-at-work) (click [here](https://github.com/chapuisk/S-at-work/archive/refs/heads/main.zip) to download it automatically)
 
-2.a Extract that ZIP file somewhere on your computer, if you downloaded it. 
+2.a Extract that ZIP file somewhere on your computer, if you downloaded it.
 
 3. [import the model in GAMA](https://gama-platform.github.io/wiki/ImportingModels).
 
 4. Enjoy our model running on your computer.
 
 <!-- USAGE EXAMPLES -->
-## Usage
+## Details
 
-### Add your own dataset
+We describe the context in which to run the proposed simulation experiments in the model
 
-TODO : have a small description and ODD link
+### Dataset
+
+There is several entry for data at initialization: basic demographic variables, workforce, work characteristics and personnality
+
+1. Demographics
+
+**Data sources**
+**Data files**
+
+2. Working force dataset:
+
+**Data sources**
+* OECD dataset, see https://stats.oecd.org/
+* Worldbank data, see https://databank.worldbank.org/reports.aspx?source=jobs
+* Eurostats is the best, see https://ec.europa.eu/eurostat/web/main/data/database
+
+**Data files**
+- 'file name here' : is about age x sex distribution of employment
+- '' : is about working time distribution
+- '' : is about wage gap
+
+3. Work characteristic dataset
+
+**Data sources**
+**Data files**
+- JC-model : empty
+- Work-role outcome model : empty
+
+4. Personality dataset
+
+**Data sources**
+**Data files**
+- Big Five Index (BFI) : empty
+
+### Model init.
+
+1. Data based initialization
+2. Parameter based initialization
+
+### Simulation experiments
+
+### ODD
+
+TODO : provide a link to the ODD
 
 <!-- ROADMAP -->
-## Roadmap
+## Future development
 
 See the [current milestone](https://github.com/chapuisk/S-at-work/milestones) for a list of proposed features (and known issues).
 
