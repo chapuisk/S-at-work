@@ -29,11 +29,15 @@ global {
 	
 	action init_organization virtual:true;
 	
+	bool stop_sim { 
+		ask worker { loop sm over:sat_memory { if abs(sm - job_satisfaction) > EPSILON {return false;} }}
+	}
+	
 }
 
-experiment "abstract_xp" virtual:true type:gui {
+experiment "abstract_xp" virtual:true type:gui until:world.stop_sim() {
 	output {
-		display "satisfaction" type: opengl {
+		display "satisfaction" type: java2D {
 			chart "satisfaction" type: series legend_font:font(0.0) series_label_position:none style:line {
 				loop w over:worker {
 					data "sat"+int(w) value:w.job_satisfaction color:rnd_color(int(w)/length(worker)*255);

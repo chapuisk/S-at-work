@@ -15,8 +15,8 @@ import "../Worker.gaml"
 global {
 	
 	bool DEBUG_MOD <- true;
-	string LEVEL <- debug_level(0);
-	int nb_agent init:5 parameter:true;
+	string LEVEL init:"DEBUG" parameter:true among:["TRACE","DEBUG","WARNING","ERROR"];
+	int nb_agent init:50 parameter:true;
 	
 	action init_workers {
 		do random_workforce_synthesis(
