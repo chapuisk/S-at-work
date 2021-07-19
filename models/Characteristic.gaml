@@ -13,12 +13,16 @@ model Characteristic
 
 global {
 	
+	// PERCEPTION VARIABLE OF CHARACTERISTICS
+	// -----
 	pair<float,float> PERCEPTION_VALENCE <- -1.0::1.0;
 	
 	float LOW_AMBIGUITY <- 0.1;
 	float MIDDLE_AMBIGUITY <- 0.3;
 	float HIGH_AMBIGUITY <- 0.6;
 	
+	// MAIN DEMOGRAPHICS
+	// -----
 	characteristic AGE;
 	characteristic GENDER;
 	characteristic EDUCATION;
@@ -76,7 +80,7 @@ species num_characteristic parent:characteristic {
 		switch gama_type {
 			match "int" {return int(val);}
 			match "float" {return float(val);}
-			default {error "Numerical work caracteristic should be int or float rather than "+gama_type;}
+			default {error "Numerical characteristic should be int or float rather than "+gama_type;}
 		}
 	}
 	

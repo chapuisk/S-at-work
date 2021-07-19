@@ -13,6 +13,78 @@ import "Global.gaml"
 
 global {
 	
+	/*
+	 * workforce synthesis based on joint distribution of demographics
+	 */
+	list<worker> workforce_synthesis(int nb, map<map<characteristic,string>,float> joint_distribution) {
+		if empty(WORK_CHARACTERISTICS) {error "Work characteristic should be initialze first";}
+		if empty(joint_distribution) {error "Cannot initialize workforce with empty distribution";}
+		create worker number:nb returns:work_force {
+			map<characteristic,string> profile <- rnd_choice(joint_distribution);
+			loop c over:profile.keys {
+				string v <- profile[c];
+				switch c.gama_type {
+					match_one ["int","float"] {
+						if float(c.get_space()[0]) > float(v) or float(c.get_space()[1]) < float(c) {
+							ask world {do syso("Wrong numerical value "+v+" for "+c,action_name::"workforce_synthesis",level::last(debug_levels));}
+						} 
+					}
+					default { 
+						if not(c.get_space() contains v) { ask world {do syso("Unmatching value "+v+" for characteristic "+c.name+" [val="+c.get_space()+"]",
+							action_name::"workforce_synthesis",level::last(debug_levels)
+						);} }
+					}
+				}
+				demographics[c] <- v;
+			}
+			// Build personality
+			ask world {do random_gaussian_personality(myself);}
+			// Build work evaluation
+			loop c over:WORK_CHARACTERISTICS { work_evaluator[c] <- world.work_eval(c); }
+		}
+		return work_force;
+	}
+	
+	/*
+	 * Default unrelated random init
+	 */
+	list<worker> random_workforce_synthesis(int nb, float male_prop, map<point,float> age_distribution, 
+		map<string,float> education_distribution, map<string,float> family_distribution
+	) {
+		if empty(WORK_CHARACTERISTICS) {error "Work characteristic should be initialze first";}
+		create worker number:nb returns:work_force {
+			demographics[GENDER] <- flip(male_prop)?string(GENDER.get_space()[0]):string(GENDER.get_space()[1]);
+			point age_range <- age_distribution=nil or empty(age_distribution)?rnd(16,65):rnd_choice(age_distribution);
+			demographics[AGE] <- string(int(rnd(age_range.x,age_range.y)));
+			demographics[EDUCATION] <- rnd_choice(education_distribution);
+			demographics[FAMILY] <- rnd_choice(family_distribution);
+			// Build personality
+			ask world {do random_gaussian_personality(myself);}
+			// Build work evaluation
+			loop c over:WORK_CHARACTERISTICS { work_evaluator[c] <- world.work_eval(c); } 
+			
+		} 
+		return work_force;
+	}
+	
+	// ----------------- //
+	// WARR'S MODEL INIT //
+	
+	/*
+	 * TODO: see in WARR's model to init work characteristic evaluation
+	 */
+	list<float> work_eval(characteristic work_char, bool rnd_weights <- false) {
+		switch work_char {
+			match SALARY {return [rnd_weights?rnd(0.0,1.0):1.0,truncated_gauss(1.0,1.0),gauss(#e,0.5),0.0];} // Pure vitamine
+			match WORKING_TIME {return [rnd_weights?rnd(0.0,1.0):1.0,truncated_gauss(1.0,1.0),gauss(#e,0.5),rnd(1.0,5.0)];} // Pure nutriment
+			match CONTRACT {return [rnd_weights?rnd(0.0,1.0):1.0,truncated_gauss(1.0,1.0),gauss(#e,0.5),0.0];}  // Pure vitamine
+			default {return [rnd_weights?rnd(0.0,1.0):1.0,truncated_gauss(1.0,1.0),gauss(#e,0.5),flip(0.5)?0:rnd(1.0,5.0)];}
+		}
+	}
+	
+	// ---------------- //
+	// PERSONALITY INIT //
+	
 	// Personality trait profile with BFI
 	pair<int,int> minmax_o <- 10::50;
 	pair<int,int> minmax_c <- 9::45;
@@ -20,30 +92,19 @@ global {
 	pair<int,int> minmax_a <- 9::45;
 	pair<int,int> minmax_n <- 8::40;
 	
-	list<worker> random_workforce_synthesis(int nb, float male_prop, map<point,float> age_distribution, 
-		map<string,float> education_distribution, map<string,float> family_distribution
-	) {
-		if empty(WORK_CHARACTERISTICS) {error "Work characteristic should be initialze first";}
-		create worker number:nb returns:work_force {
-			demographics[GENDER] <- flip(male_prop)?string(GENDER.get_space()[0]):string(GENDER.get_space()[1]);
-			point age_range <- rnd_choice(age_distribution);
-			demographics[AGE] <- string(int(rnd(age_range.x,age_range.y)));
-			demographics[EDUCATION] <- rnd_choice(education_distribution);
-			demographics[FAMILY] <- rnd_choice(family_distribution);
-			
-			_o <- int(truncated_gauss(point(minmax_o.key+(minmax_o.value-minmax_o.key)/2.0,(minmax_o.value-minmax_o.key)/2)));
-			_c <- int(truncated_gauss(point(minmax_c.key+(minmax_c.value-minmax_c.key)/2.0,(minmax_c.value-minmax_c.key)/2.0)));
-			_e <- int(truncated_gauss(point(minmax_e.key+(minmax_e.value-minmax_e.key)/2.0,(minmax_e.value-minmax_e.key)/2.0)));
-			_a <- int(truncated_gauss(point(minmax_a.key+(minmax_a.value-minmax_a.key)/2.0,(minmax_a.value-minmax_a.key)/2.0)));
-			_n <- int(truncated_gauss(point(minmax_n.key+(minmax_n.value-minmax_n.key)/2.0,(minmax_n.value-minmax_n.key)/2.0)));
-			
-			loop c over:WORK_CHARACTERISTICS {
-				work_evaluator[c] <- [rnd(0.0,1.0),truncated_gauss(1.0,1.0),gauss(#e,0.5),flip(0.5)?0:rnd(1.0,5.0)];
-			} 
-			
-		} 
-		return work_force;
+	/*
+	 * TODO: find data to init personnality
+	 */
+	worker random_gaussian_personality(worker w) {
+		w._o <- int(truncated_gauss(point(minmax_o.key+(minmax_o.value-minmax_o.key)/2.0,(minmax_o.value-minmax_o.key)/2.0)));
+		w._c <- int(truncated_gauss(point(minmax_c.key+(minmax_c.value-minmax_c.key)/2.0,(minmax_c.value-minmax_c.key)/2.0)));
+		w._e <- int(truncated_gauss(point(minmax_e.key+(minmax_e.value-minmax_e.key)/2.0,(minmax_e.value-minmax_e.key)/2.0)));
+		w._a <- int(truncated_gauss(point(minmax_a.key+(minmax_a.value-minmax_a.key)/2.0,(minmax_a.value-minmax_a.key)/2.0)));
+		w._n <- int(truncated_gauss(point(minmax_n.key+(minmax_n.value-minmax_n.key)/2.0,(minmax_n.value-minmax_n.key)/2.0)));
+		return w;	
 	}
+	
+	// --------------------------- //
 	
 	/*
 	 * DEBUG MODE FOR WORKERS

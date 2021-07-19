@@ -8,7 +8,7 @@
 
 model Experiment
 
-import "abstract exp.gaml"
+import "../Global.gaml"
 import "../Characteristic.gaml"
 import "../Worker.gaml"
 
@@ -19,11 +19,8 @@ global {
 	int nb_agent init:5 parameter:true;
 	
 	action init_workers {
-		do random_workforce_synthesis(
-			nb_agent,0.55, default_age_distribution, 
-			EDUCATION.get_space() as_map (each::rnd(1.0)), 
-			FAMILY.get_space() as_map (each::rnd(1.0))
-		);
+		do read_default_data();
+		do workforce_synthesis(nb_agent, demo_distribution);
 	}
 	
 	action init_organization {
@@ -34,8 +31,6 @@ global {
 			[SALARY::1,WORKING_TIME::-1,CONTRACT::0] // gender distribution
 		);
 	}
-	
-	map<point,float> default_age_distribution <- [point(16,24)::1.0,point(25,34)::3.0,point(35,49)::4.0,point(50,65)::2.0];
 	
 	/*
 	 * Bind workers and jobs withtin an organization
