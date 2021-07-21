@@ -149,9 +149,8 @@ species worker parent:individual {
 	float job_satisfaction;
 	
 	// PEAK-END KANHEMAN HEURISTICS
-	int memory_length <- 1; // how long do we recall freezed satisfaction
+	int memory_length <- 10; // how long do we recall freezed satisfaction
 	list<float> sat_memory;
-	float sat_peak <- #infinity;
 	
 	bool update_work_eval <- every(step);
 	bool update_social_references <- false;
@@ -204,11 +203,9 @@ species worker parent:individual {
 	 * Finally assess one's attitude toward job
 	 */
 	reflex update_attitude_toward_job {
-		if length(sat_memory) = memory_length { sat_memory >- last(sat_memory); } 
-		sat_memory <+ cognitive_resp + emotional_resp;
-		list<float> peakend <- sat_memory; if sat_peak!=#infinity { peakend <+ sat_peak; }  
-		job_satisfaction <- mean(sat_memory);
-		if sat_peak=#infinity or abs(sat_peak) < abs(job_satisfaction) { sat_peak <- job_satisfaction;}
+		if length(sat_memory) = memory_length { sat_memory >- last(sat_memory); }
+		job_satisfaction <- (sat_memory max_of (abs(each)) + cognitive_resp + emotional_resp) / 2;
+		sat_memory <+ job_satisfaction;
 	}
 
 	// ---------- //

@@ -19,9 +19,9 @@ global {
 	
 	// GLOBAL VARIABLES
 	observer main_observer;
-	float s_index -> main_observer=nil?-1:sat_dist_index(main_observer);
-	float g_index -> main_observer=nil?-1:gender_index(main_observer);
-	float a_index -> main_observer=nil?-1:age_index(main_observer);
+	float s_index -> sat_dist_index(main_observer);
+	float g_index -> gender_index(main_observer);
+	float a_index -> age_index(main_observer);
 	
 	// CONSTANTS
 	float EPSILON <- 1e-6;
@@ -84,23 +84,26 @@ global {
 	map<map<characteristic,string>,float> demo_distribution;
 	
 	// Demogrphics
-	file es_educ <- csv_file(eurostat_folder+"Age_sex_educ_employees.csv");
+	string es_educ_path <- eurostat_folder+"Age_sex_educ_employees.csv";
 	
 	// Work characteristics
-	file es_earnings <- csv_file(scripts_folder+"fitdist/fit_earning_eurostats.csv",false);
+	string es_earnings_path <- scripts_folder+"fitdist/fit_earning_eurostats.csv";
 	map<list<string>,pair<float,float>> lnorm_earning_map <- [];
 	
-	file es_time <- csv_file(eurostat_folder+"Sex_partfulltime_employement.csv");
+	string es_time_path <- eurostat_folder+"Sex_partfulltime_employement.csv";
+	list<string> time_regimes <- ["Part-time","Full-time"];
+	map<list<string>,float> bimod_workingtime_map <- [];
 	
 	/*
 	 * Read, clean and prepare default data 
+	 * TODO : create a clean log of the method activities
 	 */
 	action read_default_data {
 		
 		demo_distribution <- [];
 		
 		// Read data for educ x gender x age
-		matrix medu <- matrix(es_educ);
+		matrix medu <- matrix(csv_file(es_educ_path));
 		map<string,list<string>> gender_map <- ["Males"::["M"],"Females"::["W"]];
 		map<string,list<string>> edu_map <- [
 			"Less than primary; primary and lower secondary education (levels 0-2)"::["No education completed","Primary or lower secondary education"],
@@ -132,7 +135,7 @@ global {
 			}
 		}
 		
-		matrix mearn <- matrix(es_earnings);
+		matrix mearn <- matrix(csv_file(es_earnings_path));
 		loop row over:rows_list(mearn){
 			list<string> key <- [first(row)="F"?"W":first(row)];
 			pair<float,float> params <- float(row[3])::float(row[4]);
@@ -147,8 +150,20 @@ global {
 			loop a from:age_low_bound to:age_upper_bound { lnorm_earning_map[key+[string(a)]] <- params; }
 		}
 		
-		matrix mtime <- matrix(es_time);
+		do syso(sample(lnorm_earning_map));
 		
+		matrix mtime <- matrix(csv_file(es_time_path));
+		int midx; int widx;
+		loop row over:rows_list(mtime){
+			if row contains "Males" and row contains "Females"{ midx <- row index_of "Males"; widx <- row index_of "Females"; }
+			if time_regimes contains first(row) {
+				list<string> key <- [first(row)];
+				bimod_workingtime_map[key+["M"]] <- float(row[midx]);
+				bimod_workingtime_map[key+["W"]] <- float(row[widx]);
+			}
+		}
+		
+		do syso(sample(bimod_workingtime_map));
 	}
 	
 	// -------------------------------------------- //
@@ -186,9 +201,6 @@ global {
  */
 experiment "abstract_xp" virtual:true type:gui {
 	output {
-		monitor "sat distribution" value:s_index;
-		monitor "sat gender" value:g_index;
-		monitor "sat age" value:a_index;
 		display "satisfaction" type: opengl {
 			chart "satisfaction" type: series legend_font:font(0.0) series_label_position:none style:line {
 				loop w over:worker {
@@ -196,6 +208,9 @@ experiment "abstract_xp" virtual:true type:gui {
 				}
 			}
 		}
+		monitor "sat distribution" value:s_index;
+		monitor "sat gender" value:g_index;
+		monitor "sat age" value:a_index;
 	}
 }
 

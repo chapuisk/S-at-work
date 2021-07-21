@@ -61,13 +61,18 @@ global {
 		return o;
 	} 
 	
+	// Build the simplest possible oragnization made of a given list of works
+	organization build_single_position_orga(list<work> works) {
+		organization o <- build_orga_hierarchy([[works]],list<pair<point,point>>([]));
+		loop w over:works { w.org <- o; }
+		return o;
+	}
+	
 	// Build the simplest possible organization made of 'n' works
-	organization build_single_position_orga(int nb_work <- 1, int nb_tasks <- 0) {
+	organization build_random_single_position_orga(int nb_work <- 1, int nb_tasks <- 0) {
 		list<work> ws;
 		loop times:nb_work { ws <+ create_simple_work(nb_tasks); } 
-		organization o <- build_orga_hierarchy([[ws]],list<pair<point,point>>([]));
-		loop w over:ws { w.org <- o; }
-		return o;
+		return build_single_position_orga(ws);
 	}
 	
 	/*

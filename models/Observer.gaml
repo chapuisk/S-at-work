@@ -12,6 +12,9 @@ import "Global.gaml"
 
 global {	
 	
+	// ########################
+	// Job Satisfaction stability
+	
 	// Window of agent satisfaction
 	list<list<float>> sats;
 	
@@ -20,15 +23,18 @@ global {
 	
 	// Satisfaction equilibrium
 	reflex equilibrium {
-		if sats=nil { sats <- list_with(length(worker),list<float>([])); }
+		if sats=nil or empty(sats) { sats <- list_with(length(worker),list<float>([])); }
 		ask worker { 
 			sats[int(self)] <+ job_satisfaction;
-			if length(sats[int(self)]) > windows { sats[] >- 0; }
+			if length(sats[int(self)]) > windows { sats[int(self)][] >- 0; }
 		}
 	}
 	
 	// stop the simulation if satisfaction does not move more than 'epsilon' in a 'windows' time frame for every agent
-	bool stop_sim(float epsilon <- EPSILON) { return sats none_matches (abs(min(each) - max(each)) > epsilon); }
+	bool stop_sim(float epsilon <- EPSILON) {
+		do syso(sample(sats)); 
+		return sats none_matches (length(each) < windows or abs(min(each) - max(each)) > epsilon);
+	}
 	
 	// #########################
 	// SATISFACTION DISTRIBUTION
@@ -42,6 +48,7 @@ global {
 	 * closest index to 0 means a good fit, closest to 2 means a poor fit 
 	 */
 	float sat_dist_index(observer obs) {
+		if obs.quantiles=nil or empty(obs.quantiles) {return -1;}
 		float i; // the index
 		list<float> std_percentiles <- obs.quantiles collect (each[obs.stat_profile index_of STD]);
 		
@@ -71,6 +78,7 @@ global {
 	 * - if it is negative, it means women are less satisfied <p>
 	 */
 	float gender_index(observer obs) {
+		if obs.ws=nil or empty(obs.ws) or obs.ms=nil or empty(obs.ms) {return -1;}
 		return obs.ws[obs.stat_profile index_of AVR] - obs.ms[obs.stat_profile index_of AVR];
 	}
 	
@@ -78,6 +86,7 @@ global {
 	// AGE SATISFACTION DISTRIBUTION
 	
 	float age_index(observer obs, int y <- 25, int e <- 55) {
+		if obs.age_distribution=nil or empty(obs.age_distribution) {return -1;}
 		list<float> young <- []; list<float> mid <- []; list<float> elder <- [];
 		loop age over:obs.age_distribution.keys {
 			float m <- obs.age_distribution[age][obs.stat_profile index_of AVR];
@@ -130,9 +139,11 @@ species observer {
 	/*
 	 * The method that observe what happens in the simulation
 	 */
-	reflex observe when:every(freq) or triggered {
+	reflex observe when:every(freq) and triggered {
 		// Overall
 		overall_profile <- statistic_profile(target_agents collect (each.job_satisfaction));
+		
+		ask world {do syso(sample(every(myself.freq) and myself.triggered));}
 		
 		// Quantiles
 		quantiles <- [];

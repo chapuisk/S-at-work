@@ -22,12 +22,8 @@ global {
 	}
 	
 	action init_organization {
-		do build_single_position_orga(10);
-		do bind_worker_and_job(first(organization),list(worker),
-			[SALARY::4,WORKING_TIME::1,CONTRACT::2], // age distribution
-			[SALARY::2,WORKING_TIME::1,CONTRACT::1], // education distribution
-			[SALARY::1,WORKING_TIME::-1,CONTRACT::0] // gender distribution
-		);
+		organization o <- build_single_position_orga(worker collect (create_random_work(each)));
+		o.workers <- list(worker);
 	}
 	
 	/*
@@ -56,6 +52,8 @@ global {
 			org.workers <+ w;
 		}
 	}
+	
+	reflex observ { if stop_sim() {main_observer.triggered <- true;} }
 	
 }
 

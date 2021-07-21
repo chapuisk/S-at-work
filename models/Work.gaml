@@ -58,6 +58,8 @@ global {
 	// -------------------------------------- //
 	// WORK CREATION
 	
+	// CHARACTERISTIC OF WORK
+	
 	action init_basic_work_carac(point salary_range <- default_salary_range, float salary_equi_range <- 500.0, 
 		point working_time_range <- default_working_time_range, list<string> contract_type <- default_contract_types) {
 			SALARY <- num_characteristic(create_num_work_charac("int",salary,salary_range,equi_range::salary_equi_range));
@@ -76,6 +78,8 @@ global {
 		WORK_CHARACTERISTICS <<+ [task_identity,task_significance,skill_variety,autonomy,feedback];
 	}
 	
+	// ACTUAL WORK
+	
 	// Create the simplest work comprising 'nb_tasks' inner tasks and basic work characteristics (i.e. salary, working time and contract)
 	work create_simple_work(int nb_tasks <- 0, pair<int,int> salary_range <- nil, 
 		pair<float,float> working_hours <- avr_working_hours::std_working_hours, map<string,float> contract_weight <- contract_types_weights 
@@ -90,6 +94,31 @@ global {
 			contract::rnd_choice(contract_weight)
 		] returns:w;
 		return first(w);
+	}
+	
+	// Create work based on estimated distribution <p>
+	// see Global.gaml read_default_data method
+	work create_random_work(worker w, list<task> ts <- nil, float working_time_sigma <- 1) {
+		if lnorm_earning_map=nil or empty(lnorm_earning_map) {
+			do syso("Earning distribution map should not be null or empty",action_name::"create_random_work",level::last(debug_levels));
+		}
+		if bimod_workingtime_map=nil or empty(bimod_workingtime_map) {
+			do syso("Working time distribution map should not be null or empty",action_name::"create_random_work",level::last(debug_levels));
+		}
+		
+		// Choose betwee part or full time (i.e. any statement), then use corresponding mean value in a gaussian
+		float wt <- gauss(bimod_workingtime_map[any(bimod_workingtime_map.keys where (each contains w.demographics[GENDER]))],working_time_sigma);
+		// Choose salary according to working hours
+		pair<float,float> param <- lnorm_earning_map[[w.demographics[GENDER],w.demographics[AGE]]];
+		int s <- round(lognormal_rnd(param.key,param.value) * wt);
+		// If no tasks are given create only one
+		if ts=nil {create task returns:t; ts <- t;}
+		
+		
+		create work with:[tasks::ts,salary::s,working_time_per_week::wt,contract::any(CONTRACT.get_space())] returns:res;
+		work the_work <- first(res);
+		w.my_work <- the_work;
+		return first(res);
 	}
 	
 	// -------------------------------------- //
