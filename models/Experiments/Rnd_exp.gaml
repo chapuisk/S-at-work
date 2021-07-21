@@ -15,8 +15,6 @@ import "../Worker.gaml"
 global {
 	
 	bool DEBUG_MOD <- true;
-	string LEVEL init:"DEBUG" parameter:true among:["TRACE","DEBUG","WARNING","ERROR"];
-	int nb_agent init:50 parameter:true;
 	
 	action init_workers {
 		do read_default_data();

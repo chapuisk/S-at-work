@@ -10,20 +10,44 @@ model Global
 
 import "Work.gaml"
 import "Characteristic.gaml"
+import "Observer.gaml"
 
 global {
 	
-	// CONSTANT
+	// #####################
+	// MODEL VAR
+	
+	// GLOBAL VARIABLES
+	observer main_observer;
+	float s_index -> main_observer=nil?-1:sat_dist_index(main_observer);
+	float g_index -> main_observer=nil?-1:gender_index(main_observer);
+	float a_index -> main_observer=nil?-1:age_index(main_observer);
+	
+	// CONSTANTS
 	float EPSILON <- 1e-6;
 	
-	/*
-	 * GLOBAL INITIALIZATION
-	 */
+	// #####################
+	// PARAMETERS
+	
+	// Debug
+	string LEVEL init:"DEBUG" parameter:true among:["TRACE","DEBUG","WARNING","ERROR"] category:"Utils";
+	
+	// Input
+	int nb_agent init:50 parameter:true category:"Agent init";
+	
+	// Observer
+	int windows init:5 parameter:true category:"Observer"; // PARAMETER
+	int q_number init:10 min:4 max:10 parameter:true category:"Observer"; // PARAMETER
+	
+	// #####################
+	// GLOBAL INITIALIZATION
+	 
 	init {
 		do first_init;
 		do init_characteristics;
 		do init_workers;
 		do init_organization;
+		do init_observer;
 		do last_init;
 	}
 	
@@ -34,9 +58,15 @@ global {
 	}
 	
 	// INIT OF WORKERS
-	action init_workers {}
+	action init_workers { /* TODO : propose default init */ }
 	// INIT OF ORGANIZATION
-	action init_organization {}
+	action init_organization { /* TODO : propose default init */ }
+	
+	// INIT OBSERVER
+	action init_observer {
+		create observer with:[target_agents::list(worker),freq::1];
+		main_observer <- first(observer);
+	}
 	
 	// Can add something before global init overloading the method
 	action first_init {}
@@ -44,7 +74,7 @@ global {
 	action last_init {}
 	
 	// -------------------------------------------- //
-	// 				AD HOC POP SYNTHESIS			//
+	// 				INPUT DATA MANAGEMENT			//
 	
 	// EUROSTATS
 	// ----
@@ -116,7 +146,6 @@ global {
 	//========//
 	
 	bool DEBUG_MOD <- false;
-	string LEVEL <- "DEBUG";
 	list<string> debug_levels <- ["TRACE","DEBUG","WARNING","ERROR"];
 	
 	action syso(string msg, float benchmark_time <- -1.0, agent caller <- self, string action_name <- nil, string level <- LEVEL) {
@@ -141,6 +170,9 @@ global {
  */
 experiment "abstract_xp" virtual:true type:gui {
 	output {
+		monitor "sat distribution" value:s_index;
+		monitor "sat gender" value:g_index;
+		monitor "sat age" value:a_index;
 		display "satisfaction" type: opengl {
 			chart "satisfaction" type: series legend_font:font(0.0) series_label_position:none style:line {
 				loop w over:worker {
