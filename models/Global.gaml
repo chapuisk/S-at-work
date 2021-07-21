@@ -80,14 +80,15 @@ global {
 	// ----
 	
 	string eurostat_folder <-  "../includes/EUROSTATS/";
+	string scripts_folder <- "../scripts/";
 	map<map<characteristic,string>,float> demo_distribution;
 	
 	// Demogrphics
 	file es_educ <- csv_file(eurostat_folder+"Age_sex_educ_employees.csv");
 	
 	// Work characteristics
-	file es_earnings <- csv_file(eurostat_folder+"Age_sex_earningperh_2014.csv");
-	map<list<string>,list<float>> lnorm_map <- [];
+	file es_earnings <- csv_file(scripts_folder+"fitdist/fit_earning_eurostats.csv",false);
+	map<list<string>,pair<float,float>> lnorm_earning_map <- [];
 	
 	file es_time <- csv_file(eurostat_folder+"Sex_partfulltime_employement.csv");
 	
@@ -129,6 +130,21 @@ global {
 				actual_k <+ FAMILY::fv;
 				demo_distribution[actual_k] <- dist_medu[ck];
 			}
+		}
+		
+		matrix mearn <- matrix(es_earnings);
+		loop row over:rows_list(mearn){
+			list<string> key <- [first(row)="F"?"W":first(row)];
+			pair<float,float> params <- float(row[3])::float(row[4]);
+			int age_low_bound; int age_upper_bound;
+			switch row[1] { 
+				match "<30" { age_low_bound <- 15; age_upper_bound <- 29; }
+				match "30-39" { age_low_bound <- 30; age_upper_bound <- 39; }
+				match "40-49" { age_low_bound <- 40; age_upper_bound <- 49; }
+				match "50-59" { age_low_bound <- 50; age_upper_bound <- 59; }
+				match ">60" { age_low_bound <- 60; age_upper_bound <- 74; }
+			}
+			loop a from:age_low_bound to:age_upper_bound { lnorm_earning_map[key+[string(a)]] <- params; }
 		}
 		
 		matrix mtime <- matrix(es_time);
