@@ -58,3 +58,10 @@ global {
 }
 
 experiment test parent:abstract_xp type:gui { }
+
+experiment random_xplrt parent:abstract_xp type:batch until:world.stop_sim() { 
+	
+	parameter agent_memory var:agent_memory init:10 min:5 max:20;
+	parameter neu_rho var:neu_rho init:1 min:1 max:5;
+	
+}

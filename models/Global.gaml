@@ -39,6 +39,15 @@ global {
 	int windows init:5 parameter:true category:"Observer"; // PARAMETER
 	int q_number init:10 min:4 max:10 parameter:true category:"Observer"; // PARAMETER
 	
+	// *************** //
+	
+	// Cog
+	int agent_memory; // length of sat memory (for peak-end)
+	int neu_rho; // strenght of neuroticism on wowa: over weight the least satisfiying aspects of job 
+	
+	// Soc
+	int social_contacts;
+	
 	// #####################
 	// GLOBAL INITIALIZATION
 	 
