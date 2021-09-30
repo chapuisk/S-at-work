@@ -149,12 +149,12 @@ species worker parent:individual {
 	float job_satisfaction;
 	
 	// PEAK-END KANHEMAN HEURISTICS
-	int memory_length <- 10; // how long do we recall freezed satisfaction
+	int memory_length <- agent_memory; // how long do we recall freezed satisfaction
 	list<float> sat_memory;
 	
 	bool update_work_eval <- every(step);
 	bool update_social_references <- false;
-	int nb_interactions_with_social_references <- 1;
+	int nb_interactions_with_social_references <- social_contacts;
 	
 	/*
 	 * First update the perception of work characteristics <br>
@@ -187,8 +187,9 @@ species worker parent:individual {
 	/*
 	 * Secondly assess one emotional reaction to recent work events
 	 */
-	reflex update_emotion_resp when:not(empty(work_event)) {
-		do emotional_response_to_work_events();
+	reflex update_emotion_resp {
+		if not(empty(work_event)) { do emotional_response_to_work_events(); }
+		else { if emotional_resp=0 { disable_emotion <- true; } else { emotional_resp <- emotional_resp * emotional_decay_ratio; } }
 		work_event <- [];
 	}
 	
@@ -204,7 +205,8 @@ species worker parent:individual {
 	 */
 	reflex update_attitude_toward_job {
 		if length(sat_memory) = memory_length { sat_memory >- last(sat_memory); }
-		job_satisfaction <- (sat_memory max_of (abs(each)) + cognitive_resp + emotional_resp) / 2;
+		if disable_emotion { emotional_balance <- 0.0; } else { emotional_balance <- emotional_balance_weigth();}
+		job_satisfaction <- (sat_memory max_of (abs(each)) + cognitive_resp) / 2 * (1 - emotional_balance) + emotional_resp  * emotional_balance;
 		sat_memory <+ job_satisfaction;
 	}
 
@@ -416,48 +418,72 @@ species worker parent:individual {
 	//
 	// see : https://github.com/sorend/fuzzy4j/blob/master/src/main/java/fuzzy4j/aggregation/weighted/WeightedOWA.java
 	
-	float rho <- 0.0; // [0,1] = 1 means 'at least one', while 0 means 'everything count' 
+	float rho -> rho_agg(rho_neuroticism_weight); // [0,1] = 1 means 'at least one', while 0 means 'everything count' 
 	float gamma <- 1.0; // [0,1] the weights of weights
 	
+	/*
+	 * 
+	 */
 	float wowa(map<characteristic, pair<float,float>> val_weights, float andness <- rho, float ww <- gamma) {
 		
-		list<float> weights <- list_with(length(val_weights),0.0);
-		if (rho = 1.0) { // handle border-case, rho = 1.0
-            weights[length(weights)-1] <- 1.0;
+		// Weights given by value ordering, with andness parameter
+		list<float> oWeights <- list_with(length(val_weights),0.0);
+		if (andness = 1.0) { // handle border-case, rho = 1.0
+            oWeights[length(oWeights)-1] <- 1.0;
         } else {
         	// calculate the two roots for rho
-        	float t_m <- (-(rho - 0.5) - sqrt(((rho - 0.5) * (rho - 0.5)) - (4 * (rho - 1) * rho))) / (2 * (rho - 1));
-        	float t_p <- (-(rho - 0.5) + sqrt(((rho - 0.5) * (rho - 0.5)) - (4 * (rho - 1) * rho))) / (2 * (rho - 1));
+        	float t_m <- (-(andness - 0.5) - sqrt(((andness - 0.5) * (andness - 0.5)) - (4 * (andness - 1) * andness))) / (2 * (andness - 1));
+        	float t_p <- (-(andness - 0.5) + sqrt(((andness - 0.5) * (andness - 0.5)) - (4 * (andness - 1) * andness))) / (2 * (andness - 1));
         	float t <- max(t_m, t_p);
 
         	float s <- 0.0;
         	loop i from:0 to:length(val_weights)-1 {
-        		weights[i] <- t^i;
-        		s <- s + weights[i]; 
+        		oWeights[i] <- t^i;
+        		s <- s + oWeights[i]; 
         	}
         	loop i from:0 to:length(val_weights)-1 {
-            	weights[i] <- weights[i] / s;
+            	oWeights[i] <- oWeights[i] / s;
         	}
         }
+        
+        if abs(1.0 - sum(oWeights)) > EPSILON { ask world {do syso("Weights = "+oWeights,caller::myself,action_name::"wowa",level::last(debug_levels));} }
 		
 		list<characteristic> sorted_carac <- val_weights.keys sort_by (val_weights[each].key);
 		sorted_carac <- reverse(sorted_carac);
+		
+		// The user defined weights
+		list<float> uWeights <- sorted_carac collect (val_weights[each].value);
+		uWeights <- uWeights collect (each/sum(uWeights));
+		
+		// TODO : Original library seems to work with [0;1] values (and weights)
+		float max_val <- val_weights max_of (each.key);
+		
 		float s <- 0.0;
-		if (rho >= 0.5) {
-            float R_exp <- gamma * ((2 * rho) - 1);
+		if (andness >= 0.5) {
+            float R_exp <- ww * ((2 * andness) - 1);
             loop v over:sorted_carac {
-            	float I_R <- 1 - val_weights[v].value ^ R_exp * (1 - val_weights[v].key);
-                s <- s + weights[sorted_carac index_of v] * I_R;
+            	float I_R <- max_val - uWeights[sorted_carac index_of v] ^ R_exp * (max_val - val_weights[v].key);
+                s <- s + oWeights[sorted_carac index_of v] * I_R;
             }
         }
         else {
-            float R_exp <- gamma * ((2 * (1 - rho)) - 1);
+            float R_exp <- ww * ((2 * (1 - andness)) - 1);
             loop v over:sorted_carac {
-                float I_R <- 1 - val_weights[v].value ^ R_exp * val_weights[v].key;
-                s <- s + weights[sorted_carac index_of v] * I_R;
+                float I_R <- max_val - uWeights[sorted_carac index_of v] ^ R_exp * val_weights[v].key;
+                s <- s + oWeights[sorted_carac index_of v] * I_R;
             }
         }
         return s;
+	}
+	
+	// weight of neuroticism on cognitive aspect of negative evaluation
+	int rho_neuroticism_weight <- neu_rho;
+	
+	/*
+	 * How much bad experience is weighted upon work characteristic evaluation
+	 */
+	float rho_agg(int neuroticism_weight <- 0, float randomness <- rnd(1.0)) {
+		return neuroticism_weight=0?0.0:(_n / minmax_n.value * neuroticism_weight + randomness) / (neuroticism_weight + 1);
 	}
 	
 	// ------- //
@@ -465,6 +491,8 @@ species worker parent:individual {
 	// ------- //
 	
 	float emotional_resp;
+	bool disable_emotion;
+	float emotional_decay_ratio <- 0.95;
 	
 	list<float> work_event;
 	
@@ -474,9 +502,22 @@ species worker parent:individual {
 		
 		// TODO
 		
+		// See : http://koreascience.or.kr/article/JAKO201915658234951.page
+		// * Extraversion will increase positive response
+		// * Neuroticism will increase negative response
+		
 		if DEBUG_WORKER and t != 0 { 
 			ask world { do syso("empty emotional process",machine_time-t,myself,debug_level(0)); }
 		}
+	}
+	
+	float emotional_balance;
+	
+	/*
+	 * How much emotional response is important in job satisfaction
+	 */
+	float emotional_balance_weigth(int openness_weight <- 3, float randomness <- rnd(1.0)) {
+		return openness_weight=0?0.5:(_o / minmax_o.value * openness_weight + randomness) / (openness_weight+1); 
 	}
 	
 }
