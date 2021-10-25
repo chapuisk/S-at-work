@@ -35,7 +35,7 @@ global {
 						);} }
 					}
 				}
-				demographics[c] <- v;
+				_demographics[c] <- v;
 			}
 			// Build personality
 			ask world {do random_gaussian_personality(myself);}
@@ -53,11 +53,11 @@ global {
 	) {
 		if empty(WORK_CHARACTERISTICS) {error "Work characteristic should be initialze first";}
 		create worker number:nb returns:work_force {
-			demographics[GENDER] <- flip(male_prop)?string(GENDER.get_space()[0]):string(GENDER.get_space()[1]);
+			_demographics[GENDER] <- flip(male_prop)?string(GENDER.get_space()[0]):string(GENDER.get_space()[1]);
 			point age_range <- age_distribution=nil or empty(age_distribution)?rnd(16,65):rnd_choice(age_distribution);
-			demographics[AGE] <- string(int(rnd(age_range.x,age_range.y)));
-			demographics[EDUCATION] <- rnd_choice(education_distribution);
-			demographics[FAMILY] <- rnd_choice(family_distribution);
+			_demographics[AGE] <- string(int(rnd(age_range.x,age_range.y)));
+			_demographics[EDUCATION] <- rnd_choice(education_distribution);
+			_demographics[FAMILY] <- rnd_choice(family_distribution);
 			// Build personality
 			ask world {do random_gaussian_personality(myself);}
 			// Build work evaluation
@@ -76,7 +76,7 @@ global {
 	list<float> work_eval(characteristic work_char, bool rnd_weights <- false) {
 		switch work_char {
 			match SALARY {return [rnd_weights?rnd(0.0,1.0):1.0,truncated_gauss(1.0,1.0),gauss(#e,0.5),0.0];} // Pure vitamine
-			match WORKING_TIME {return [rnd_weights?rnd(0.0,1.0):1.0,truncated_gauss(1.0,1.0),gauss(#e,0.5),rnd(1.0,5.0)];} // Pure nutriment
+			match WORKING_TIME {return [rnd_weights?rnd(0.0,1.0):1.0,truncated_gauss(1.0,1.0),gauss(#e,0.5),rnd(1.0,5.0)];} // Nutriment
 			match CONTRACT {return [rnd_weights?rnd(0.0,1.0):1.0,truncated_gauss(1.0,1.0),gauss(#e,0.5),0.0];}  // Pure vitamine
 			default {return [rnd_weights?rnd(0.0,1.0):1.0,truncated_gauss(1.0,1.0),gauss(#e,0.5),flip(0.5)?0:rnd(1.0,5.0)];}
 		}
@@ -120,7 +120,7 @@ global {
 
 species individual virtual:true {
 	
-	map<characteristic,string> demographics;
+	map<characteristic,string> _demographics;
 	
 	list<individual> relatives;
 	list<individual> friends;
@@ -137,24 +137,43 @@ species individual virtual:true {
 	
 }
 
+/*
+ * Main active entity of the model, inherit from individual in all aspect related to personnality, demographics and social references
+ */
 species worker parent:individual {
 	
+	init {
+		
+		// HOMOGENEOUS INIT
+		// --
+		
+		// length of memery
+		__memory_length <- default_agent_memory;
+		// Does agent update social referents?
+		__update_social_references <- default_update_social_referents;
+		// Number of social contacts for each work evaluation
+		__nb_interactions_with_social_references <- default_nb_social_contacts;
+		
+		// HETEROGENEOUS INIT
+	}
+	
+	// ----------------------------- //
+	
 	work my_work;
-	map<characteristic, string> work_aspects; // work aspect with there subjective value
+	map<characteristic, string> _work_aspects; // work aspect with there subjective value
 	
 	// ----------------------------- //
 	
 	// ATTITUDE TOWARD THE JOB //
 	
-	float job_satisfaction;
+	float _job_satisfaction;
 	
 	// PEAK-END KANHEMAN HEURISTICS
-	int memory_length <- agent_memory; // how long do we recall freezed satisfaction
-	list<float> sat_memory;
+	int __memory_length; // how long do we recall freezed satisfaction
+	list<float> __sat_memory;
 	
-	bool update_work_eval <- every(step);
-	bool update_social_references <- false;
-	int nb_interactions_with_social_references <- social_contacts;
+	// Should be event based
+	bool __update_work_eval -> every(step);
 	
 	/*
 	 * First update the perception of work characteristics <br>
@@ -167,21 +186,21 @@ species worker parent:individual {
 		if DEBUG_WORKER and DEBUG_TARGET contains self {t <- machine_time;}
 		loop c over:WORK_CHARACTERISTICS {
 			switch c {
-				match SALARY {work_aspects[SALARY] <- string(my_work=nil?0:my_work.salary);}
+				match SALARY {_work_aspects[SALARY] <- string(my_work=nil?0:my_work.salary);}
 				match WORKING_TIME {
-					if not(work_aspects contains_key WORKING_TIME) { 
-						work_aspects[WORKING_TIME] <- string(with_precision(my_work.working_time_per_week/#h,2));
+					if not(_work_aspects contains_key WORKING_TIME) { 
+						_work_aspects[WORKING_TIME] <- string(with_precision(my_work.working_time_per_week/#h,2));
 					}
 				}
 				match CONTRACT {
-					if not(work_aspects contains_key CONTRACT) {  work_aspects[CONTRACT] <- string(my_work.contract); }
+					if not(_work_aspects contains_key CONTRACT) {  _work_aspects[CONTRACT] <- string(my_work.contract); }
 				}
 				default {
-					if not(work_aspects contains_key c) { work_aspects[c] <- perceive_work_characteristics(c,my_work);}
+					if not(_work_aspects contains_key c) { _work_aspects[c] <- perceive_work_characteristics(c,my_work);}
 				}
 			}
 		}
-		if DEBUG_WORKER and t != 0 {ask world { do syso(sample(myself.work_aspects),machine_time-t,myself,"update_work_characteristic_perception",debug_level(0)); }}
+		if DEBUG_WORKER and t != 0 {ask world { do syso(sample(myself._work_aspects),machine_time-t,myself,"update_work_characteristic_perception",debug_level(0)); }}
 	}
 	
 	/*
@@ -196,18 +215,18 @@ species worker parent:individual {
 	/*
 	 * Third evaluate work characteristics
 	 */
-	reflex update_cognitive_resp when:update_work_eval {
-		do socio_cognitive_evaluation_of_work(update_social_references, nb_interactions_with_social_references);
+	reflex update_cognitive_resp when:__update_work_eval {
+		do socio_cognitive_evaluation_of_work(__update_social_references, __nb_interactions_with_social_references);
 	}
 	
 	/*
 	 * Finally assess one's attitude toward job
 	 */
 	reflex update_attitude_toward_job {
-		if length(sat_memory) = memory_length { sat_memory >- last(sat_memory); }
+		if length(__sat_memory) = __memory_length { __sat_memory >- last(__sat_memory); }
 		if disable_emotion { emotional_balance <- 0.0; } else { emotional_balance <- emotional_balance_weigth();}
-		job_satisfaction <- (sat_memory max_of (abs(each)) + cognitive_resp) / 2 * (1 - emotional_balance) + emotional_resp  * emotional_balance;
-		sat_memory <+ job_satisfaction;
+		_job_satisfaction <- (__sat_memory max_of (abs(each)) + _cognitive_resp) / 2 * (1 - emotional_balance) + emotional_resp  * emotional_balance;
+		__sat_memory <+ _job_satisfaction;
 	}
 
 	// ---------- //
@@ -243,7 +262,7 @@ species worker parent:individual {
 	// COGNITION //
 	// --------- //
 	
-	float cognitive_resp;
+	float _cognitive_resp;
 	
 	/*
 	 * Update cognitive work aspect
@@ -251,9 +270,9 @@ species worker parent:individual {
 	action socio_cognitive_evaluation_of_work(bool update_social_ref <- true, int nb_interactions <- -1) {
 		
 		// Update evaluation criterion
-		if empty(social_references) or update_social_ref {social_references <- update_social_references();}
+		if empty(__social_references) or update_social_ref {__social_references <- update_social_references();}
 		if nb_interactions <= 0 {do contrast_and_assimilation;}
-		else {do contrast_and_assimilation(nb_interactions among social_references);}
+		else {do contrast_and_assimilation(nb_interactions among __social_references);}
 		
 		float t;
 		if DEBUG_WORKER and DEBUG_TARGET contains self {t <- machine_time;}
@@ -261,7 +280,7 @@ species worker parent:individual {
 		// Assess one job's characteristics impact based on vitamin model
 		map<characteristic, pair<float,float>> val_weights <- [];
 		loop wc over:WORK_CHARACTERISTICS {
-			val_weights[wc] <- get_warr_factor(wc,work_aspects[wc], work_evaluator[wc][1], work_evaluator[wc][2], work_evaluator[wc][3])::work_evaluator[wc][0];
+			val_weights[wc] <- get_warr_factor(wc,_work_aspects[wc], work_evaluator[wc][1], work_evaluator[wc][2], work_evaluator[wc][3])::work_evaluator[wc][0];
 		}
 		
 		if DEBUG_WORKER and t != 0 { 
@@ -270,18 +289,23 @@ species worker parent:individual {
 		}
 		
 		// Aggregate characteristics' impact vector into a single job impact
-		cognitive_resp <- wowa(val_weights);
+		_cognitive_resp <- wowa(val_weights);
 		
 		if DEBUG_WORKER and t != 0 { 
-			ask world { do syso(sample(myself.cognitive_resp),machine_time-t,myself,"WOWA",debug_level(0)); }
+			ask world { do syso(sample(myself._cognitive_resp),machine_time-t,myself,"WOWA",debug_level(0)); }
 		}
 	}
 	
 	// ---------------------------
 	// Social relations
 	
-	list<worker> social_references;
-	float org_kindship_factor <- 1.0;
+		
+	// How to manage social referents to compare to
+	bool __update_social_references;
+	int __nb_interactions_with_social_references;
+	
+	list<worker> __social_references;
+	float org_kindship_factor <- 1.0; // How close from my point i evaluate people from my own organization - 1 is neutral value (linear over network distance)
 	
 	/*
 	 * Update the list of social references
@@ -337,39 +361,42 @@ species worker parent:individual {
 	map<characteristic, list<float>> work_evaluator;
 	
 	// slope of the log
-	float a <- 1.0;
+	float a <- default_a;
 	// base of the log 
-	float b <- #e;
+	float b <- default_b;
 	// decreasing factor
-	float d <- 0.0;
+	float d <- default_d;
 	
 	/*
-	 * basic function is a * log_b(x+1) * (tanh(x*d)+1)
+	 * basic function is: a * log_b(x + 1) * (tanh(-x*d) + e)
 	 * <p>
 	 * when d = 0 pure vitamine (no decrement) </br>
 	 * when d > 0 nutriment behavior </br>
+	 * when a [0;+inf] increase the curve's amplitude increase (sharper up and down)
+	 * when 0 > d > 1 the tipping point increase (the more it is closer to 0)
+	 * when d > 1 the tipping point decrease (for d=1, the equation returns 0 for x=1)
 	 * 
 	 */
 	float get_warr_factor(characteristic wc, string value, float slope <- a, float base <- b, float decrease <- d){
-		return slope * log(wc.get_numerical_value(value) + 1) / log(base) * (tanh(-wc.get_numerical_value(value)*decrease) + 1);
+		return slope * log(wc.get_numerical_value(value) + 1) / log(base) * (tanh(-wc.get_numerical_value(value)*decrease) + #e);
 	}
 	
 	// ------------------------------------
 	// ANCHOR FOR CONTRAST AND ASSIMILATION
 	
-	int nb_wc_exchange <- 1;
+	int nb_wc_exchange <- default_work_charac_exchange_nb;
 	
 	/*
 	 * Get closer to evaluation criteria from assimilated individuals and away from contrasting ones
 	 */
-	action contrast_and_assimilation(list<worker> interact_with <- social_references) {
+	action contrast_and_assimilation(list<worker> interact_with <- __social_references) {
 		float t; map<worker,float> interact_magnitude;
 		if DEBUG_WORKER and DEBUG_TARGET contains self {t <- machine_time;}
 		
 		loop sr over:interact_with { 
 			
 			float assim <- get_anchor(sr, get_organizational_kinship(sr));
-			list<characteristic> wcs <- nb_wc_exchange among (work_aspects.keys union sr.work_aspects.keys);
+			list<characteristic> wcs <- nb_wc_exchange among (_work_aspects.keys union sr._work_aspects.keys);
 			
 			if t != 0 {interact_magnitude[sr] <- assim;}
 			loop wc over:wcs {	
@@ -399,15 +426,15 @@ species worker parent:individual {
 	 */
 	float get_anchor(worker compare_to, float close) {
 		float similarities;
-		int nb_anchors <- length(demographics);
-		loop dc over:compare_to.demographics.keys {
-			if close > dc.ambiguity and dc.compare_values(compare_to.demographics[dc],demographics[dc])=0 {similarities <- similarities+1;}
+		int nb_anchors <- length(_demographics);
+		loop dc over:compare_to._demographics.keys {
+			if close > dc.ambiguity and dc.compare_values(compare_to._demographics[dc],_demographics[dc])=0 {similarities <- similarities+1;}
 		}
-		list<characteristic> anchors <- compare_to.work_aspects.keys where ( each.ambiguity < close );
+		list<characteristic> anchors <- compare_to._work_aspects.keys where ( each.ambiguity < close );
 		nb_anchors <- nb_anchors + length(anchors); 
 		loop anchor over:anchors {
-			if work_aspects contains_key anchor {
-				if anchor.compare_values(work_aspects[anchor],compare_to.work_aspects[anchor]) = 0 {similarities <- similarities+1;}
+			if _work_aspects contains_key anchor {
+				if anchor.compare_values(_work_aspects[anchor],compare_to._work_aspects[anchor]) = 0 {similarities <- similarities+1;}
 			}
 		}
 		return similarities / nb_anchors;
@@ -418,22 +445,30 @@ species worker parent:individual {
 	//
 	// see : https://github.com/sorend/fuzzy4j/blob/master/src/main/java/fuzzy4j/aggregation/weighted/WeightedOWA.java
 	
-	float rho -> rho_agg(rho_neuroticism_weight); // [0,1] = 1 means 'at least one', while 0 means 'everything count' 
-	float gamma <- 1.0; // [0,1] the weights of weights
+	//float rho; // [0,1] = 1 means 'at least one', while 0 means 'everything count' 
+	float gamma <- default_gamma; // [0,1] the weights of weights
 	
 	/*
 	 * 
 	 */
-	float wowa(map<characteristic, pair<float,float>> val_weights, float andness <- rho, float ww <- gamma) {
+	float wowa(map<characteristic, pair<float,float>> val_weights, float andness <- rho_agg(), float ww <- gamma) {
+		
+		if 0 > andness or andness > 1 {
+			error sample(andness)+" should be "+(0>andness?"higher than 0":"lower than 1")
+				+" -- See var "+sample(_n)+sample(minmax_n.value)+sample(rho_neuroticism_weight);
+		}
 		
 		// Weights given by value ordering, with andness parameter
 		list<float> oWeights <- list_with(length(val_weights),0.0);
 		if (andness = 1.0) { // handle border-case, rho = 1.0
             oWeights[length(oWeights)-1] <- 1.0;
         } else {
+        	write sample(andness);
         	// calculate the two roots for rho
         	float t_m <- (-(andness - 0.5) - sqrt(((andness - 0.5) * (andness - 0.5)) - (4 * (andness - 1) * andness))) / (2 * (andness - 1));
+        	write sample(t_m);
         	float t_p <- (-(andness - 0.5) + sqrt(((andness - 0.5) * (andness - 0.5)) - (4 * (andness - 1) * andness))) / (2 * (andness - 1));
+        	write sample(t_p);
         	float t <- max(t_m, t_p);
 
         	float s <- 0.0;
@@ -444,6 +479,7 @@ species worker parent:individual {
         	loop i from:0 to:length(val_weights)-1 {
             	oWeights[i] <- oWeights[i] / s;
         	}
+        	write sample(oWeights);
         }
         
         if abs(1.0 - sum(oWeights)) > EPSILON { ask world {do syso("Weights = "+oWeights,caller::myself,action_name::"wowa",level::last(debug_levels));} }
@@ -477,14 +513,12 @@ species worker parent:individual {
 	}
 	
 	// weight of neuroticism on cognitive aspect of negative evaluation
-	int rho_neuroticism_weight <- neu_rho;
+	float rho_neuroticism_weight <- default_neu_rho;
 	
 	/*
 	 * How much bad experience is weighted upon work characteristic evaluation
 	 */
-	float rho_agg(int neuroticism_weight <- 0, float randomness <- rnd(1.0)) {
-		return neuroticism_weight=0?0.0:(_n / minmax_n.value * neuroticism_weight + randomness) / (neuroticism_weight + 1);
-	}
+	float rho_agg(float neuroticism_weight <- rho_neuroticism_weight) { return _n / minmax_n.value * neuroticism_weight; }
 	
 	// ------- //
 	// EMOTION //

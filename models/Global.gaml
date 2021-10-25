@@ -24,7 +24,10 @@ global {
 	float a_index -> age_index(main_observer);
 	
 	// CONSTANTS
-	float EPSILON <- 1e-6;
+	float EPSILON <- 1e-6 const:true;
+	
+	// BATCH MODE
+	bool batch_mode <- false;
 	
 	// #####################
 	// PARAMETERS
@@ -42,11 +45,22 @@ global {
 	// *************** //
 	
 	// Cog
-	int agent_memory; // length of sat memory (for peak-end)
-	int neu_rho; // strenght of neuroticism on wowa: over weight the least satisfiying aspects of job 
+	int default_agent_memory <- 5; // length of sat memory (for peak-end)
+	
+	// W-OWA
+	float default_neu_rho <- 0.0 parameter:true min:0.0 max:1.0 category:"W-OWA"; // strenght of neuroticism on wowa: over weight the least satisfiying aspects of job
+	float default_gamma <- 1.0 parameter:true min:0.001 max:1.0 category:"W-OWA"; // weight of weights in wowa
+	
+	// Warr's function
+	float default_a <- 1.0 parameter:true min:1.0 max:100.0 category:"Warr's model";
+	float default_b <- #e parameter:true min:0.001 max:20.0 category:"Warr's model";
+	float default_d <- 0.0 parameter:true min:0.0 max:100.0 category:"Warr's model"; 
 	
 	// Soc
-	int social_contacts;
+	bool default_update_social_referents <- false;
+	int default_nb_social_contacts <- 0;
+	
+	int default_work_charac_exchange_nb <- 1;
 	
 	// #####################
 	// GLOBAL INITIALIZATION
@@ -70,12 +84,6 @@ global {
 	action init_workers { /* TODO : propose default init */ }
 	// INIT OF ORGANIZATION
 	action init_organization { /* TODO : propose default init */ }
-	
-	// INIT OBSERVER
-	action init_observer {
-		create observer with:[target_agents::list(worker),freq::1];
-		main_observer <- first(observer);
-	}
 	
 	// Can add something before global init overloading the method
 	action first_init {}
@@ -172,7 +180,7 @@ global {
 			}
 		}
 		
-		do syso(sample(bimod_workingtime_map));
+		do syso(sample(bimod_workingtime_map),level::first(debug_levels));
 	}
 	
 	// -------------------------------------------- //
@@ -210,10 +218,10 @@ global {
  */
 experiment "abstract_xp" virtual:true type:gui {
 	output {
-		display "satisfaction" type: opengl {
+		display "satisfaction" {
 			chart "satisfaction" type: series legend_font:font(0.0) series_label_position:none style:line {
 				loop w over:worker {
-					data "sat"+int(w) value:w.job_satisfaction color:rnd_color(int(w)/length(worker)*255);
+					data "sat"+int(w) value:w._job_satisfaction color:rnd_color(int(w)/length(worker)*255);
 				}
 			}
 		}

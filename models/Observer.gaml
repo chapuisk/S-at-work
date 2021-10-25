@@ -13,27 +13,37 @@ import "Global.gaml"
 global {	
 	
 	// ########################
+	// OBSERVER
+	
+	// Constants for observers
+	string MIN <- "min"; string MAX <- "max"; string MED <- "median"; string AVR <- "mean"; string STD <- "std";
+		
+	// INIT OBSERVER
+	action init_observer {
+		create observer with:[target_agents::list(worker),freq::1];
+		main_observer <- first(observer);
+	}
+	
+	// ########################
 	// Job Satisfaction stability
 	
 	// Window of agent satisfaction
 	list<list<float>> sats;
 	
-	// Constants for observers
-	string MIN <- "min"; string MAX <- "max"; string MED <- "median"; string AVR <- "mean"; string STD <- "std";
-	
 	// Satisfaction equilibrium
 	reflex equilibrium {
 		if sats=nil or empty(sats) { sats <- list_with(length(worker),list<float>([])); }
 		ask worker { 
-			sats[int(self)] <+ job_satisfaction;
+			sats[int(self)] <+ _job_satisfaction;
 			if length(sats[int(self)]) > windows { sats[int(self)][] >- 0; }
 		}
 	}
 	
 	// stop the simulation if satisfaction does not move more than 'epsilon' in a 'windows' time frame for every agent
 	bool stop_sim(float epsilon <- EPSILON) {
-		do syso(sample(sats)); 
-		return sats none_matches (length(each) < windows or abs(min(each) - max(each)) > epsilon);
+		do syso(sample(sats),level::first(debug_levels)); 
+		bool stop <- sats none_matches (length(each) < windows or abs(min(each) - max(each)) > epsilon);
+		return stop;
 	}
 	
 	// #########################
@@ -55,8 +65,8 @@ global {
 		// least deviatives percentile
 		int idx_least_std <- (std_percentiles index_of min(std_percentiles)); 
 		
-		// Peak should be close to Q3
-		i <- i + abs(idx_least_std / length(std_percentiles) - 3.0 * length(std_percentiles) / 4);
+		// Peak should be close to 0.75 percentile
+		i <- abs(idx_least_std / length(std_percentiles) - 0.75);
 		
 		// How std curve fits u-shape
 		int curve_dist;
@@ -141,25 +151,25 @@ species observer {
 	 */
 	reflex observe when:every(freq) and triggered {
 		// Overall
-		overall_profile <- statistic_profile(target_agents collect (each.job_satisfaction));
+		overall_profile <- statistic_profile(target_agents collect (each._job_satisfaction));
 		
 		ask world {do syso(sample(every(myself.freq) and myself.triggered));}
 		
 		// Quantiles
 		quantiles <- [];
-		list<list<float>> all_sat_sorted <- list<list<float>>((target_agents collect (each.job_satisfaction)) split_in q_number);
+		list<list<float>> all_sat_sorted <- list<list<float>>((target_agents collect (each._job_satisfaction)) split_in q_number);
 		loop q over:all_sat_sorted {quantiles <+ statistic_profile(q);}
 		
 		// W vs M
-		loop gender over:target_agents group_by (each.demographics[GENDER]) {
-			list<float> gender_sat <- gender collect (each.job_satisfaction);
-			if first(gender).demographics[GENDER]="M" { ms <- statistic_profile(gender_sat);} else {ws <- statistic_profile(gender_sat);}
+		loop gender over:target_agents group_by (each._demographics[GENDER]) {
+			list<float> gender_sat <- gender collect (each._job_satisfaction);
+			if first(gender)._demographics[GENDER]="M" { ms <- statistic_profile(gender_sat);} else {ws <- statistic_profile(gender_sat);}
 		}
 		
 		// U-shaped age x sat
 		age_distribution <- [];
-		map<int,list<worker>> age_workers <- target_agents group_by (AGE.get_numerical_value(each.demographics[AGE]));
-		loop age over:age_workers.keys { age_distribution[age] <- statistic_profile(age_workers[age] collect (each.job_satisfaction)); }
+		map<int,list<worker>> age_workers <- target_agents group_by (AGE.get_numerical_value(each._demographics[AGE]));
+		loop age over:age_workers.keys { age_distribution[age] <- statistic_profile(age_workers[age] collect (each._job_satisfaction)); }
 	}
 	
 	/*

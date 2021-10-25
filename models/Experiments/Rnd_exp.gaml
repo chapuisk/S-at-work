@@ -42,9 +42,9 @@ global {
 		loop w over:workers {
 			map<characteristic,float> weights;
 			loop c over:[SALARY,WORKING_TIME,CONTRACT] {
-				weights[c] <- AGE.get_numerical_value(w.demographics[AGE]) * age_dist[c] +
-				(w.demographics[GENDER]="M"?1:-1) * male_dist[c] + 
-				EDUCATION.get_numerical_value(w.demographics[EDUCATION]) * educ_dist[c];
+				weights[c] <- AGE.get_numerical_value(w._demographics[AGE]) * age_dist[c] +
+					(w._demographics[GENDER]="M"?1:-1) * male_dist[c] + 
+					EDUCATION.get_numerical_value(w._demographics[EDUCATION]) * educ_dist[c];
 			} 
 			w.my_work <- rnd_choice(jobs as_map (each::
 				job_salary[each]*weights[SALARY]+job_time[each]*weights[WORKING_TIME]+job_contract[each]*weights[CONTRACT]
@@ -53,15 +53,34 @@ global {
 		}
 	}
 	
-	reflex observ { if stop_sim() {main_observer.triggered <- true;} }
+	reflex observ when:not(batch_mode) { if stop_sim() {main_observer.triggered <- true; do pause;} }
 	
 }
 
 experiment test parent:abstract_xp type:gui { }
 
-experiment random_xplrt parent:abstract_xp type:batch until:world.stop_sim() { 
+experiment random_xplrt type:batch repeat:10 until:world.stop_sim() { 
 	
-	parameter agent_memory var:agent_memory init:10 min:5 max:20;
-	parameter neu_rho var:neu_rho init:1 min:1 max:5;
+	init {
+		batch_mode <- true;
+	}
+	
+	parameter default_agent_memory var:default_agent_memory init:5 min:5 max:20 step:5;
+	parameter default_neu_rho var:default_neu_rho init:0.0 min:0.0 max:1.0 step:0.1;
+	
+	method exhaustive;
+	
+	permanent {
+		display main {
+			chart "outputs" type:series {
+				data "s index" value:mean(simulations collect world.sat_dist_index(each.main_observer)) 
+					y_err_values:standard_deviation(simulations collect world.sat_dist_index(each.main_observer)) color:#blue;
+				data "g index" value:mean(simulations collect world.gender_index(each.main_observer)) 
+					y_err_values:standard_deviation(simulations collect world.gender_index(each.main_observer)) color:#orange;
+				data "a index" value:mean(simulations collect world.age_index(each.main_observer)) 
+					y_err_values:standard_deviation(simulations collect world.age_index(each.main_observer)) color:#green;
+			}
+		}
+	}
 	
 }

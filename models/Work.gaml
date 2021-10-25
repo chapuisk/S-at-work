@@ -107,9 +107,9 @@ global {
 		}
 		
 		// Choose betwee part or full time (i.e. any statement), then use corresponding mean value in a gaussian
-		float wt <- gauss(bimod_workingtime_map[any(bimod_workingtime_map.keys where (each contains w.demographics[GENDER]))],working_time_sigma);
+		float wt <- gauss(bimod_workingtime_map[any(bimod_workingtime_map.keys where (each contains w._demographics[GENDER]))],working_time_sigma);
 		// Choose salary according to working hours
-		pair<float,float> param <- lnorm_earning_map[[w.demographics[GENDER],w.demographics[AGE]]];
+		pair<float,float> param <- lnorm_earning_map[[w._demographics[GENDER],w._demographics[AGE]]];
 		int s <- round(lognormal_rnd(param.key,param.value) * wt);
 		// If no tasks are given create only one
 		if ts=nil {create task returns:t; ts <- t;}
