@@ -166,7 +166,7 @@ species nominal_characteristic parent:characteristic {
 	
 	float get_numerical_value(string val) {
 		if not(values contains val) {error "Ask for an unknown value "+val+" : "+values;}
-		return 1;
+		return values index_of val;
 	}
 	
 	string share_value(string val, float information_level <- 1.0) {
