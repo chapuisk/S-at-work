@@ -16,18 +16,14 @@ global {
 	
 	bool DEBUG_MOD <- true;
 	
-	action init_workers {
-		do read_default_data();
-		do workforce_synthesis(nb_agent, demo_distribution);
-	}
-	
-	action init_organization {
-		organization o <- build_single_position_orga(worker collect (create_random_work(each)));
-		o.workers <- list(worker);
-	}
-	
+//	action init_organization {
+//		organization o <- build_single_position_orga(worker collect (create_random_work(each)));
+//		o.workers <- list(worker);
+//	}
+
 	/*
 	 * Bind workers and jobs withtin an organization
+	 * ==UNUSED==
 	 */
 	action bind_worker_and_job(organization org, list<worker> workers,
 		map<characteristic,int> age_dist,
@@ -53,7 +49,7 @@ global {
 		}
 	}
 	
-	reflex observ when:not(batch_mode) { if stop_sim() {main_observer.triggered <- true; do pause;} }
+	reflex observ { if stop_sim() {main_observer.triggered <- true; if not(batch_mode) {do pause;}} }
 	
 }
 
@@ -68,17 +64,20 @@ experiment random_xplrt type:batch repeat:10 until:world.stop_sim() {
 	parameter default_agent_memory var:default_agent_memory init:5 min:5 max:20 step:5;
 	parameter default_neu_rho var:default_neu_rho init:0.0 min:0.0 max:1.0 step:0.1;
 	
+	parameter default_nb_contacts var:default_nb_contacts init:0 min:0 max:50 step:5;
+	parameter default_nb_wchar_ex var:default_nb_wchar_ex init:1 min:1 max:3;
+	
 	method exhaustive;
 	
 	permanent {
 		display main {
 			chart "outputs" type:series {
-				data "s index" value:mean(simulations collect world.sat_dist_index(each.main_observer)) 
-					y_err_values:standard_deviation(simulations collect world.sat_dist_index(each.main_observer)) color:#blue;
-				data "g index" value:mean(simulations collect world.gender_index(each.main_observer)) 
-					y_err_values:standard_deviation(simulations collect world.gender_index(each.main_observer)) color:#orange;
-				data "a index" value:mean(simulations collect world.age_index(each.main_observer)) 
-					y_err_values:standard_deviation(simulations collect world.age_index(each.main_observer)) color:#green;
+				data "s index" legend:string(default_agent_memory)+"|"+default_neu_rho value:mean(simulations collect each.s_index) 
+					y_err_values:[simulations min_of each.s_index,simulations max_of each.s_index] color:#blue;
+				data "g index" legend:string(default_agent_memory)+"|"+default_neu_rho value:mean(simulations collect each.g_index) 
+					y_err_values:standard_deviation(simulations collect each.g_index) color:#orange;
+				data "a index" legend:string(default_agent_memory)+"|"+default_neu_rho value:mean(simulations collect each.a_index) 
+					y_err_values:standard_deviation(simulations collect each.a_index) color:#green;
 			}
 		}
 	}

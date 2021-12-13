@@ -20,8 +20,8 @@ global {
 	// GLOBAL VARIABLES
 	observer main_observer;
 	float s_index -> sat_dist_index(main_observer);
-	float g_index -> gender_index(main_observer);
-	float a_index -> age_index(main_observer);
+	float g_index -> gender_pearson(main_observer);
+	float a_index -> age_pseudo_two_lines_index(main_observer);
 	
 	// CONSTANTS
 	float EPSILON <- 1e-6 const:true;
@@ -36,7 +36,7 @@ global {
 	string LEVEL init:"DEBUG" parameter:true among:["TRACE","DEBUG","WARNING","ERROR"] category:"Utils";
 	
 	// Input
-	int nb_agent init:50 parameter:true category:"Agent init";
+	int nb_agent init:1000 parameter:true category:"Agent init";
 	
 	// Observer
 	int windows init:5 parameter:true category:"Observer"; // PARAMETER
@@ -58,21 +58,74 @@ global {
 	
 	// Soc
 	bool default_update_social_referents <- false;
-	int default_nb_social_contacts <- 0;
+	int default_nb_contacts <- 0;
 	
-	int default_work_charac_exchange_nb <- 1;
+	int default_nb_wchar_ex <- 1;
+	
+	// *************** //
+	
+	// Network
+	graph sn;
+	string net_type <- "SmallWorld" among:["Random","ScaleFree","SmallWorld"];
+	
+	float erdos_renyi_p <- 0.05 min:0.01 max:1.0;
+	
+	int barabasi_m <- 4 min:1 max:nb_agent;
+	
+	float watts_strogatz_p <- 0.05 min:0.001 max:0.1;
+	int watts_strogatz_k <- 4 min:2 max:10; // Must be even
 	
 	// #####################
 	// GLOBAL INITIALIZATION
+	// PROCESS
 	 
 	init {
+		float t <- machine_time;
+		do syso("Start init");
 		do first_init;
+		do syso("- Create characteristics");
 		do init_characteristics;
+		do syso("-- demographics: "
+			+"\n\t"+AGE.name+": "+AGE.get_space()
+			+"\n\t"+GENDER.name+": "+GENDER.get_space()
+			+"\n\t"+EDUCATION.name+": "+EDUCATION.get_space()
+			+"\n\t"+FAMILY.name+": "+FAMILY.get_space()
+			+"\n\tWork characteristics: "+WORK_CHARACTERISTICS collect (each.name)
+		);
+		do syso("- Create synthetic work force");
 		do init_workers;
+		do syso("-- "+length(worker)+" workers: "
+			+"\n\t"+worker count (each._demographics[GENDER]="M")+" male | "
+				+worker count (each._demographics[GENDER]="W")+" female"
+			+"\n\t"+worker min_of (AGE.get_numerical_value(each._demographics[AGE]))+" min | "
+				+worker max_of (AGE.get_numerical_value(each._demographics[AGE]))+" max | "
+				+mean(worker collect (AGE.get_numerical_value(each._demographics[AGE])))+" avrg " 
+		);
+		do syso("- Create work organizations");
 		do init_organization;
+		do syso("-- "+length(organization)+" organizations"
+			+"\n\t"+organization min_of length(each.workers)+" min | "
+			+"\n\t"+organization max_of length(each.workers)+" max | "
+			+"\n\t"+mean(organization collect length(each.workers))+" avrg"
+		);
+		do syso("- Create social network");
+		do init_network;
+		do syso("-- "+length(sn.vertices)+" nodes and "+length(sn.edges)+" edges"
+			+"\n\t average degree: "+mean(noeud collect (sn degree_of each))
+			+"\n\t betweeness: "+betweenness_centrality(sn)
+			+"\n\t alpha (prop of cycles): "+alpha_index(sn)
+			+"\n\t gamma (prop of links): "+gamma_index(sn)
+		);
+		do syso("- Init observer and outcomes");
 		do init_observer;
 		do last_init;
+		do syso("End init - total time equals "
+			+with_precision((machine_time-t/1000),2)+"s"
+		);
 	}
+	
+	// #####################
+	// STEP INITIALIZATION
 	
 	// INIT of CHARACTERISTICS
 	action init_characteristics {
@@ -81,9 +134,59 @@ global {
 	}
 	
 	// INIT OF WORKERS
-	action init_workers { /* TODO : propose default init */ }
+	action init_workers {
+		do read_default_data();
+		do workforce_synthesis(nb_agent, demo_distribution); 
+	}
+	
+	// INIT OF SOCIAL CONNECTIONS
+	action init_network {
+		switch net_type {
+			match "Random" { 
+				sn <- generate_complete_graph(noeud,lien,length(worker),false);
+				loop e over:sn.edges { if(flip(1-erdos_renyi_p)) {remove edge(e) from:sn;}}
+			}
+			match "ScaleFree" {
+				sn <- generate_barabasi_albert(noeud,lien,length(worker),barabasi_m,false);
+			}
+			match "SmallWorld" {
+				sn <- generate_watts_strogatz(noeud,lien,length(worker),
+						watts_strogatz_p,watts_strogatz_k,false);
+			}
+			match "Default" {}
+		} 
+		map<noeud,worker> nw <- []; map<worker,noeud> wn; list n <- list(noeud);
+		loop w over:worker { noeud cn <- any(n); n >- cn; nw[cn] <- w; }
+		ask worker { friends <- (sn neighbors_of wn[self]) collect (nw[noeud(each)]); }
+ 	}
+	
 	// INIT OF ORGANIZATION
-	action init_organization { /* TODO : propose default init */ }
+	action init_organization {
+		list a <- list(worker); 
+		loop while:not(empty(a)) {
+			// Adjust distribution of firm size to remaining number of worker
+			if orga_sizes.keys one_matches (each.key > length(a)) { 
+				orga_sizes <- (orga_sizes.keys where (each.key <= length(a))) 
+					as_map (each::orga_sizes[each]>length(a)?length(a):orga_sizes[each]);
+			}
+			// Draw a size for the organization and as many worker
+			pair<int,int> p <- rnd_choice(orga_sizes);
+			int n <- rnd(p.key,p.value);
+			list sub_a <- n>length(a) ? a : n among a;
+			
+			// Create works according to agent demographics
+			map<worker,work> sub_w <- sub_a as_map (each::create_random_work(each));
+			loop w over:sub_w.keys {w.my_work <- sub_w[w];} 
+			
+			// Create a simple organization
+			organization o <- build_single_position_orga(sub_w.values);
+			o.workers <- sub_a;
+			
+			// Remove workers that have been assigned a job and an organization
+			a >>- o.workers;
+		}
+		
+	}
 	
 	// Can add something before global init overloading the method
 	action first_init {}
@@ -167,7 +270,7 @@ global {
 			loop a from:age_low_bound to:age_upper_bound { lnorm_earning_map[key+[string(a)]] <- params; }
 		}
 		
-		do syso(sample(lnorm_earning_map));
+		do syso(sample(lnorm_earning_map),level::first(debug_levels));
 		
 		matrix mtime <- matrix(csv_file(es_time_path));
 		int midx; int widx;
@@ -181,6 +284,12 @@ global {
 		}
 		
 		do syso(sample(bimod_workingtime_map),level::first(debug_levels));
+		
+		// Orga stuff
+		// INSEE Data on the distribution of french firms according to the number of employees
+		orga_sizes <- [(1::9)::1028.1,(10::49)::172.6,(50::99)::18.1,
+			(100::249)::10.8,(250::nb_agent>250?nb_agent:250)::6.3
+		];
 	}
 	
 	// -------------------------------------------- //
@@ -212,6 +321,9 @@ global {
 	action err(string msg, agent caller <- self, string action_name <- nil) { error "["+caller.name+(action_name=nil?"":"|"+action_name)+"] "+msg; }
 	
 }
+
+// Fake species to build network
+species lien {} species noeud {}
 
 /*
  * ABSTRACT XP - TO BE OVERLOADED

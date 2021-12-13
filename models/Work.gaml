@@ -58,6 +58,7 @@ global {
 	// -------------------------------------- //
 	// WORK CREATION
 	
+	// ====== BUILDER
 	// CHARACTERISTIC OF WORK
 	
 	action init_basic_work_carac(point salary_range <- default_salary_range, float salary_equi_range <- 500.0, 
@@ -78,6 +79,7 @@ global {
 		WORK_CHARACTERISTICS <<+ [task_identity,task_significance,skill_variety,autonomy,feedback];
 	}
 	
+	// ====== FACTORY
 	// ACTUAL WORK
 	
 	// Create the simplest work comprising 'nb_tasks' inner tasks and basic work characteristics (i.e. salary, working time and contract)

@@ -41,7 +41,7 @@ global {
 	
 	// stop the simulation if satisfaction does not move more than 'epsilon' in a 'windows' time frame for every agent
 	bool stop_sim(float epsilon <- EPSILON) {
-		do syso(sample(sats),level::first(debug_levels)); 
+		do syso(sample(sats),level::debug_level(0)); 
 		bool stop <- sats none_matches (length(each) < windows or abs(min(each) - max(each)) > epsilon);
 		return stop;
 	}
@@ -83,17 +83,41 @@ global {
 	// GENDER SATISFACTION
 	
 	/*
-	 * The index measure how women does compare to men: <p>
-	 * - if it is positive, it means women are more satisfied (upper it is, the more there are satisfied overall) <p>
+	 * Pearson's correlation coefficient
+	 * - if it is positive, it means women (numerical code is 1) are more satisfied <p>
 	 * - if it is negative, it means women are less satisfied <p>
 	 */
-	float gender_index(observer obs) {
-		if obs.ws=nil or empty(obs.ws) or obs.ms=nil or empty(obs.ms) {return -1;}
-		return obs.ws[obs.stat_profile index_of AVR] - obs.ms[obs.stat_profile index_of AVR];
+	float gender_pearson(observer obs) {
+		if obs.gender_sat=nil or empty(obs.gender_sat) {return 0;}
+		return correlation(
+			obs.gender_sat collect (each.key),
+			obs.gender_sat collect (each.value)
+		);
 	}
 	
 	// #########################
 	// AGE SATISFACTION DISTRIBUTION
+	
+	float age_pseudo_two_lines_index(observer obs, int c <- 55) {
+		if not(obs.triggered) {return 0.0;}
+		pair p <- obs.get_age_matrix(c); 
+		regression below_c <- build(p.key);
+		regression above_c <- build(p.value);
+		
+		float res;
+		
+		list pbc <- []; list ebc <- [];
+		loop r over:rows_list(p.key) { pbc <+ last(r); ebc <+ predict(below_c,[first(r)]); } 
+		float pvalue_bc <- 0.0; //tTest(pbc,ebc);
+		list pac <- []; list eac <- [];
+		loop r over:rows_list(p.value) { pac <+ last(r); eac <+ predict(above_c,[first(r)]); }
+		float pvalue_ac <- 0.0; //tTest(pac,eac);
+		
+		if first(below_c.parameters) < 0 { res <- res + 1; }
+		if first(above_c.parameters) > 0 { res <- res + 2; }
+		
+		return res*(1-pvalue_bc)*(1-pvalue_ac)/2;
+	}
 	
 	float age_index(observer obs, int y <- 25, int e <- 55) {
 		if obs.age_distribution=nil or empty(obs.age_distribution) {return -1;}
@@ -102,26 +126,7 @@ global {
 			float m <- obs.age_distribution[age][obs.stat_profile index_of AVR];
 			if age < y { young <+ m;} else if age < e { mid <+ m;} else { elder <+ m;}
 		}
-		return (young count (each > min(mid)) / 1.0*length(young)) * (mid count (each < min(elder)) / 1.0*length(mid)); 
-	}
-	
-	/*
-	 * return p_value, for age sat-unsat (higher or lower than median sat) correlation
-	 */
-	float age_dependancy_p_value(observer obs) {
-		float med <- obs.overall_profile[obs.stat_profile index_of MED];
-		
-		float st;
-		loop age over:obs.age_distribution {
-			float expected <- length(age)/2.0;
-			st <- st + (age count (each < med) - expected)^2/expected + (age count (each > med) - expected)^2/expected;
-		}
-		
-		float alpha <- 0.5;
-		loop while:true {
-			if st < chi_square(alpha,length(obs.age_distribution)-1) {return alpha;}
-			alpha <- alpha/10;
-		}
+		return (young count (each > max(mid)) / (1.0*length(young))) * (mid count (each < min(elder)) / (1.0*length(mid))); 
 	}
 }
 
@@ -136,8 +141,7 @@ species observer {
 	list<list<float>> quantiles;
 	
 	// Women vs men
-	list<float> ws;
-	list<float> ms;
+	list<pair<int,float>> gender_sat;
 	
 	// U-shape with age
 	// each age = min,max,median,mean,std
@@ -161,15 +165,14 @@ species observer {
 		loop q over:all_sat_sorted {quantiles <+ statistic_profile(q);}
 		
 		// W vs M
-		loop gender over:target_agents group_by (each._demographics[GENDER]) {
-			list<float> gender_sat <- gender collect (each._job_satisfaction);
-			if first(gender)._demographics[GENDER]="M" { ms <- statistic_profile(gender_sat);} else {ws <- statistic_profile(gender_sat);}
-		}
-		
+		loop a over:target_agents { gender_sat <+ a.numerical(GENDER)::a._job_satisfaction; }
+	
 		// U-shaped age x sat
 		age_distribution <- [];
-		map<int,list<worker>> age_workers <- target_agents group_by (AGE.get_numerical_value(each._demographics[AGE]));
+		map<int,list<worker>> age_workers <- target_agents group_by (each.numerical(AGE));
 		loop age over:age_workers.keys { age_distribution[age] <- statistic_profile(age_workers[age] collect (each._job_satisfaction)); }
+		
+		
 	}
 	
 	/*
@@ -188,4 +191,22 @@ species observer {
 		}
 		return sp;
 	}
+	
+	/*
+	 * Returns age matrix for statistical test <\p>
+	 * parameter c (int) is the inflection point, splitting age matrix below/above c (below inclusive)
+	 */
+	 pair<matrix<float>,matrix<float>> get_age_matrix(int c) {
+	
+	 	// Age matrix below c
+		matrix bc <- (target_agents where (each.numerical(AGE) <= c)) 
+			accumulate ([each.numerical(AGE),each._job_satisfaction])
+			as_matrix {2,length(target_agents)};
+		// Age matrix above c
+		matrix ac <- (target_agents where (each.numerical(AGE) > c)) 
+			accumulate ([each.numerical(AGE),each._job_satisfaction])
+			as_matrix {2,length(target_agents)};
+			
+		return bc::ac;
+	 }
 }

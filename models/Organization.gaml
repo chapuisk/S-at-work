@@ -18,6 +18,9 @@ global {
 	int DEFAULT_VERTICAL_DISTANCE_UNIT <- 2;
 	int DEFAULT_HORIZONTAL_DISTANCE_UNIT <- 1;
 	
+	// SOME BASIC INIT STUFF
+	map<pair<int,int>,float> orga_sizes; 
+	
 	/*
 	 * Build an organization from its hierarchy
 	 * <p>

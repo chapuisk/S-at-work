@@ -135,6 +135,18 @@ species individual virtual:true {
 	
 	// -------------
 	
+	/*
+	 * Get the corresponding demographic value
+	 */
+	string get(characteristic char) {return (_demographics contains_key char) ? _demographics[char] : "";}
+	
+	/*
+	 * Get the corresponding demographic numerical value
+	 */
+	float numerical(characteristic char) { 
+		if not(_demographics contains_key char) {error "Call to a wrong demographic variable !";}
+		return char.get_numerical_value(_demographics[char]);
+	}
 }
 
 /*
@@ -152,7 +164,7 @@ species worker parent:individual {
 		// Does agent update social referents?
 		__update_social_references <- default_update_social_referents;
 		// Number of social contacts for each work evaluation
-		__nb_interactions_with_social_references <- default_nb_social_contacts;
+		__nb_interactions_with_social_references <- default_nb_contacts;
 		
 		// HETEROGENEOUS INIT
 	}
@@ -301,7 +313,7 @@ species worker parent:individual {
 	
 		
 	// How to manage social referents to compare to
-	bool __update_social_references;
+	bool __update_social_references; // upd_soc_ref
 	int __nb_interactions_with_social_references;
 	
 	list<worker> __social_references;
@@ -384,7 +396,7 @@ species worker parent:individual {
 	// ------------------------------------
 	// ANCHOR FOR CONTRAST AND ASSIMILATION
 	
-	int nb_wc_exchange <- default_work_charac_exchange_nb;
+	int nb_wc_exchange <- default_nb_wchar_ex;
 	
 	/*
 	 * Get closer to evaluation criteria from assimilated individuals and away from contrasting ones
@@ -463,12 +475,9 @@ species worker parent:individual {
 		if (andness = 1.0) { // handle border-case, rho = 1.0
             oWeights[length(oWeights)-1] <- 1.0;
         } else {
-        	write sample(andness);
         	// calculate the two roots for rho
         	float t_m <- (-(andness - 0.5) - sqrt(((andness - 0.5) * (andness - 0.5)) - (4 * (andness - 1) * andness))) / (2 * (andness - 1));
-        	write sample(t_m);
         	float t_p <- (-(andness - 0.5) + sqrt(((andness - 0.5) * (andness - 0.5)) - (4 * (andness - 1) * andness))) / (2 * (andness - 1));
-        	write sample(t_p);
         	float t <- max(t_m, t_p);
 
         	float s <- 0.0;
@@ -479,7 +488,6 @@ species worker parent:individual {
         	loop i from:0 to:length(val_weights)-1 {
             	oWeights[i] <- oWeights[i] / s;
         	}
-        	write sample(oWeights);
         }
         
         if abs(1.0 - sum(oWeights)) > EPSILON { ask world {do syso("Weights = "+oWeights,caller::myself,action_name::"wowa",level::last(debug_levels));} }
