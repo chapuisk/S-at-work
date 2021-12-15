@@ -12,6 +12,7 @@ import "../Global.gaml"
 
 global {
 	string output_file <- "../../batch_output/results.csv";
+	bool DEBUG_MOD <- true;
 }
 
 experiment stochastic_xp parent:abstract_batch type:batch 

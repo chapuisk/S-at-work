@@ -60,7 +60,7 @@ global {
 	
 	// Network
 	graph sn;
-	string net_type <- "SmallWorld" among:["Random","ScaleFree","SmallWorld"];
+	string net_type <- "Random" among:["Random","ScaleFree","SmallWorld"];
 	
 	float erdos_renyi_p <- 0.05 min:0.01 max:1.0;
 	
@@ -110,6 +110,7 @@ global {
 			+"\n\t alpha (prop of cycles): "+alpha_index(sn)
 			+"\n\t gamma (prop of links): "+gamma_index(sn)
 		);
+		ask lien {do die;} ask noeud {do die;}
 		do syso("- Init observer and outcomes");
 		do init_observer;
 		do last_init;
@@ -135,6 +136,7 @@ global {
 	
 	// INIT OF SOCIAL CONNECTIONS
 	action init_network {
+		float t <- machine_time;
 		switch net_type {
 			match "Random" { 
 				sn <- generate_complete_graph(noeud,lien,length(worker),false);
@@ -149,9 +151,11 @@ global {
 			}
 			match "Default" {}
 		} 
+		do syso("Network generated",benchmark_time::machine_time-t);
 		map<noeud,worker> nw <- []; map<worker,noeud> wn; list n <- list(noeud);
 		loop w over:worker { noeud cn <- any(n); n >- cn; nw[cn] <- w; }
 		ask worker { friends <- (sn neighbors_of wn[self]) collect (nw[noeud(each)]); }
+		do syso("Assign workers in network",benchmark_time::machine_time-t);
  	}
 	
 	// INIT OF ORGANIZATION
@@ -406,16 +410,16 @@ experiment abstract_batch virtual:true type:batch until:world.stop_sim() {
 		type:csv to:output_file rewrite:true header:false;
 		
 		ask simulations {
-			save [int(self),s_index,g_index,a_index]+main_observer.qSat
-				+[main_observer.gSat["W"][MOMENTS index_of MIN],
-					main_observer.gSat["W"][MOMENTS index_of AVR],
-					main_observer.gSat["W"][MOMENTS index_of MAX]
+			save [int(self),self.s_index,self.g_index,self.a_index]+self.main_observer.qSat
+				+[self.main_observer.gSat["W"][MOMENTS index_of MIN],
+					self.main_observer.gSat["W"][MOMENTS index_of AVR],
+					self.main_observer.gSat["W"][MOMENTS index_of MAX]
 				]
-				+[main_observer.gSat["M"][MOMENTS index_of MIN],
-					main_observer.gSat["M"][MOMENTS index_of AVR],
-					main_observer.gSat["M"][MOMENTS index_of MAX]
+				+[self.main_observer.gSat["M"][MOMENTS index_of MIN],
+					self.main_observer.gSat["M"][MOMENTS index_of AVR],
+					self.main_observer.gSat["M"][MOMENTS index_of MAX]
 				]
-				+main_observer.aSat 
+				+self.main_observer.aSat 
 			type:csv to:output_file rewrite:false;
 		}
 		
