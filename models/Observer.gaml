@@ -46,7 +46,12 @@ global {
 		bool stop <- sats none_matches (length(each) < windows or abs(min(each) - max(each)) > epsilon);
 		if stop {
 			ask main_observer {do end_outputs;}
-			if batch_mode { ask main_observer { do update_qSat; do update_aSat; do update_gSat; } }
+			if batch_mode { 
+				ask main_observer { do update_qSat; do update_aSat; do update_gSat; }
+				s_index_batch <- sat_dist_index(main_observer);
+				g_index_batch <- gender_pearson(main_observer);
+				a_index_batch <- age_pseudo_two_lines_index(main_observer); 
+			}
 		}
 		return stop;
 	}
@@ -63,7 +68,7 @@ global {
 	 * closest index to 0 means a good fit, closest to 2 means a poor fit 
 	 */
 	float sat_dist_index(observer obs, bool std_based <- true) {
-		if obs.quantiles=nil or empty(obs.quantiles) {return -1;}
+		if obs.quantiles=nil or empty(obs.quantiles) {return -1.0;}
 		float i; // the index
 		
 		list<float> i_percentiles;
@@ -88,8 +93,8 @@ global {
 		if idx_least_std>0 {
 			matrix<float> mat_b <- {2,idx_least_std+1} matrix_with 0.0;
 			loop idx from:0 to:idx_least_std {mat_b[0,idx] <- idx; mat_b[1,idx] <- i_percentiles[idx];}
-			do syso(string(mat_b));
-			regression below_c <- build(mat_b);
+			do syso(sample(mat_b));
+			below_c <- build(mat_b);
 			do syso(sample(below_c));
 		}
 		
@@ -97,8 +102,8 @@ global {
 		if length(i_percentiles)-idx_least_std>1 {
 			matrix<float> mat_a <- {2,length(i_percentiles)-idx_least_std} matrix_with 0.0;
 			loop idx from:0 to:length(i_percentiles)-idx_least_std-1 {mat_a[0,idx] <- idx; mat_a[1,idx] <- i_percentiles[idx+idx_least_std];}
-			do syso(string(mat_a));
-			regression above_c <- build(mat_a);
+			do syso(sample(mat_a));
+			above_c <- build(mat_a);
 			do syso(sample(above_c));
 		}
 		
@@ -114,7 +119,7 @@ global {
 	 * - if it is negative, it means women are less satisfied <p>
 	 */
 	float gender_pearson(observer obs) {
-		if obs.gender_sat=nil or empty(obs.gender_sat) {return 0;}
+		if obs.gender_sat=nil or empty(obs.gender_sat) {return 0.0;}
 		return correlation(
 			obs.gender_sat collect (each.key),
 			obs.gender_sat collect (each.value)
@@ -134,10 +139,10 @@ global {
 		
 		list pbc <- []; list ebc <- [];
 		loop r over:rows_list(p.key) { pbc <+ last(r); ebc <+ predict(below_c,[first(r)]); } 
-		float pvalue_bc <- 0.0; //tTest(pbc,ebc);
+		float pvalue_bc <- 0.0;// tTest(pbc,ebc);
 		list pac <- []; list eac <- [];
 		loop r over:rows_list(p.value) { pac <+ last(r); eac <+ predict(above_c,[first(r)]); }
-		float pvalue_ac <- 0.0; //tTest(pac,eac);
+		float pvalue_ac <- 0.0;// tTest(pac,eac);
 		
 		if first(below_c.parameters) < 0 { res <- res + 1; }
 		if first(above_c.parameters) > 0 { res <- res + 1; }
@@ -195,7 +200,7 @@ species observer {
 		
 		// Quantiles
 		quantiles <- [];
-		list<list<float>> all_sat_sorted <- list<list<float>>((target_agents collect (each._job_satisfaction)) split_in q_number);
+		list<list<float>> all_sat_sorted <- partitions((target_agents collect (each._job_satisfaction)),q_number);
 		loop q over:all_sat_sorted {quantiles <+ statistic_profile(q);}
 		
 		// W vs M
@@ -229,12 +234,28 @@ species observer {
 	}
 	
 	/*
+	 * Makes a partition of a given list of float into 'bins' sub list of (quasi) equal size
+	 */
+	list<list<float>> partitions(list<float> vals, int bins, bool ordered <- false) {
+		list<list<float>> res;
+		list<float> cloned_vals <- ordered ? copy(vals) : vals sort each;
+		int bins_length <- int(length(vals) / bins);
+		loop times:bins-1 {
+			list<float> bin_vals <- cloned_vals copy_between (0,bins_length);
+			res <+ bin_vals;
+			cloned_vals >>- bin_vals;
+		}
+		res <+ cloned_vals;
+		return res;
+	}
+	
+	/*
 	 * Return a given moment of quantiles value
 	 */
 	list<float> quantile_moment(list<float> values, string moment) {
 		list<float> res <- [];
-		if length(remove_duplicates(values)) < q_number {return list_with(q_number,0.0);}
-		list<list<float>> all_sat_sorted <- list<list<float>>(values split_in q_number);
+		list<list<float>> all_sat_sorted <- partitions(values, q_number);
+		if length(all_sat_sorted) != q_number {error "Partitions operator return "+length(all_sat_sorted)+ " split, while asked for "+q_number;}
 		loop q over:all_sat_sorted {res <+ first(statistic_profile(q,[moment]));}
 		return res;
 	}

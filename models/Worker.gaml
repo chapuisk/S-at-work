@@ -144,7 +144,7 @@ species individual virtual:true {
 	 * Get the corresponding demographic numerical value
 	 */
 	float numerical(characteristic char) { 
-		if not(_demographics contains_key char) {error "Call to a wrong demographic variable !";}
+		if not(_demographics contains_key char) {error sample(self)+" call a wrong demographic variable: "+char.name;}
 		return char.get_numerical_value(_demographics[char]);
 	}
 }

@@ -70,11 +70,11 @@ experiment random_xplrt type:batch repeat:10 until:world.stop_sim() {
 	permanent {
 		display main {
 			chart "outputs" type:series {
-				data "s index" legend:string(default_agent_memory)+"|"+default_neu_rho value:mean(simulations collect each.s_index) 
+				data "s index" legend:string(default_agent_memory)+"|"+default_neu_rho value:mean(simulations collect each.s_index_batch) 
 					y_err_values:[simulations min_of each.s_index,simulations max_of each.s_index] color:#blue;
-				data "g index" legend:string(default_agent_memory)+"|"+default_neu_rho value:mean(simulations collect each.g_index) 
+				data "g index" legend:string(default_agent_memory)+"|"+default_neu_rho value:mean(simulations collect each.g_index_batch) 
 					y_err_values:standard_deviation(simulations collect each.g_index) color:#orange;
-				data "a index" legend:string(default_agent_memory)+"|"+default_neu_rho value:mean(simulations collect each.a_index) 
+				data "a index" legend:string(default_agent_memory)+"|"+default_neu_rho value:mean(simulations collect each.a_index_batch) 
 					y_err_values:standard_deviation(simulations collect each.a_index) color:#green;
 			}
 		}

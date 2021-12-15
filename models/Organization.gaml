@@ -155,7 +155,7 @@ species organization {
 	
 	// The hierarchical level of worker 'w'
 	int get_hierarchy_level(worker w) {
-		return get_position(w.my_work).shape.location.y;
+		return int(get_position(w.my_work).shape.location.y);
 	}
 	
 	// The organizational distance between job 'w1' and job 'w2'

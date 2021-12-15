@@ -80,7 +80,7 @@ species num_characteristic parent:characteristic {
 	
 	float get_numerical_value(string val) {
 		switch gama_type {
-			match "int" {return int(val);}
+			match "int" {return with_precision(int(val),0);}
 			match "float" {return float(val);}
 			default {error "Numerical characteristic should be int or float rather than "+gama_type;}
 		}
@@ -106,7 +106,7 @@ species num_characteristic parent:characteristic {
 	int compare_values(string val1, string val2) { 
 		float diff <- get_numerical_value(val1) - get_numerical_value(val2);
 		if abs(diff) < equality_range {return 0;}
-		return diff;
+		return int(diff);
 	}
 	
 	string perceived_as(float valence, list frame <- PERCEPTION_VALENCE) {
@@ -127,7 +127,7 @@ species ordered_characteristic parent:characteristic {
 	
 	float get_numerical_value(string val) {
 		if not(values contains val) {error "Ask for an unknown value "+val+" : "+values;}
-		return values index_of val;
+		return float(values index_of val);
 	}
 	
 	string share_value(string val, float information_level <- 1.0) {
@@ -168,7 +168,7 @@ species nominal_characteristic parent:characteristic {
 	
 	float get_numerical_value(string val) {
 		if not(values contains val) {error "Ask for an unknown value "+val+" : "+values;}
-		return values index_of val;
+		return float(values index_of val);
 	}
 	
 	string share_value(string val, float information_level <- 1.0) {

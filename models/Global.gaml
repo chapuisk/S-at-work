@@ -20,8 +20,11 @@ global {
 	// GLOBAL VARIABLES
 	observer main_observer;
 	float s_index -> sat_dist_index(main_observer);
+	float s_index_batch;
 	float g_index -> gender_pearson(main_observer);
+	float g_index_batch;
 	float a_index -> age_pseudo_two_lines_index(main_observer);
+	float a_index_batch;
 	
 	// CONSTANTS
 	float EPSILON <- 1e-6 const:true;
@@ -62,8 +65,9 @@ global {
 	graph sn;
 	string net_type <- "Random" among:["Random","ScaleFree","SmallWorld"];
 	
-	float erdos_renyi_p <- 0.05 min:0.01 max:1.0;
+	int erdos_renyi_k <- 4 min:1 max:20;
 	
+	int barabasi_start <- 10 min:1 max:int(nb_agent/4);
 	int barabasi_m <- 4 min:1 max:nb_agent;
 	
 	float watts_strogatz_p <- 0.05 min:0.001 max:0.1;
@@ -105,11 +109,11 @@ global {
 		do syso("- Create social network");
 		do init_network;
 		do syso("-- "+length(sn.vertices)+" nodes and "+length(sn.edges)+" edges"
-			+"\n\t average degree: "+mean(noeud collect (sn degree_of each))
-			+"\n\t betweeness: "+betweenness_centrality(sn)
+			+"\n\t average degree: "+mean(worker collect (sn degree_of each))
 			+"\n\t alpha (prop of cycles): "+alpha_index(sn)
 			+"\n\t gamma (prop of links): "+gamma_index(sn)
 		);
+		sn <- nil;
 		ask lien {do die;} ask noeud {do die;}
 		do syso("- Init observer and outcomes");
 		do init_observer;
@@ -139,15 +143,13 @@ global {
 		float t <- machine_time;
 		switch net_type {
 			match "Random" { 
-				sn <- generate_complete_graph(noeud,lien,length(worker),false);
-				loop e over:sn.edges { if(flip(1-erdos_renyi_p)) {remove edge(e) from:sn;}}
+				sn <- generate_random_graph(length(worker),length(worker)*erdos_renyi_k,false,noeud,lien);
 			}
 			match "ScaleFree" {
-				sn <- generate_barabasi_albert(noeud,lien,length(worker),barabasi_m,false);
+				sn <- generate_barabasi_albert(barabasi_start,length(worker),barabasi_m,false,noeud,lien);
 			}
 			match "SmallWorld" {
-				sn <- generate_watts_strogatz(noeud,lien,length(worker),
-						watts_strogatz_p,watts_strogatz_k,false);
+				sn <- generate_watts_strogatz(length(worker),watts_strogatz_p,watts_strogatz_k,false,noeud,lien);
 			}
 			match "Default" {}
 		} 
@@ -162,11 +164,6 @@ global {
 	action init_organization {
 		list a <- list(worker); 
 		loop while:not(empty(a)) {
-			// Adjust distribution of firm size to remaining number of worker
-			if orga_sizes.keys one_matches (each.key > length(a)) { 
-				orga_sizes <- (orga_sizes.keys where (each.key <= length(a))) 
-					as_map (each::orga_sizes[each]>length(a)?length(a):orga_sizes[each]);
-			}
 			// Draw a size for the organization and as many worker
 			pair<int,int> p <- rnd_choice(orga_sizes);
 			int n <- rnd(p.key,p.value);
@@ -339,7 +336,6 @@ global {
 	
 }
 
-// Fake species to build network
 species lien {} species noeud {}
 
 /*
@@ -357,15 +353,14 @@ experiment "abstract_xp" virtual:true type:gui {
 		display "satisfaction distribution" {
 			chart "satisfaction std" type:histogram {
 				data "Q0" value:main_observer.qSat[0] color:#red;
-				data "Q1" value:main_observer.qSat[1] color:blend(#red,#green,1-1.0/9);
-				data "Q2" value:main_observer.qSat[2] color:blend(#red,#green,1-2.0/9);
-				data "Q3" value:main_observer.qSat[3] color:blend(#red,#green,1-3.0/9);
-				data "Q4" value:main_observer.qSat[4] color:blend(#red,#green,1-4.0/9);
-				data "Q5" value:main_observer.qSat[5] color:blend(#red,#green,1-5.0/9);
-				data "Q6" value:main_observer.qSat[6] color:blend(#red,#green,1-6.0/9);
-				data "Q7" value:main_observer.qSat[7] color:blend(#red,#green,1-7.0/9);
-				data "Q8" value:main_observer.qSat[8] color:blend(#red,#green,1-8.0/9);
-				data "Q9" value:main_observer.qSat[9] color:#green;
+				data "Q1" value:main_observer.qSat[1] color:blend(#red,#green,1-1.0/8);
+				data "Q2" value:main_observer.qSat[2] color:blend(#red,#green,1-2.0/8);
+				data "Q3" value:main_observer.qSat[3] color:blend(#red,#green,1-3.0/8);
+				data "Q4" value:main_observer.qSat[4] color:blend(#red,#green,1-4.0/8);
+				data "Q5" value:main_observer.qSat[5] color:blend(#red,#green,1-5.0/8);
+				data "Q6" value:main_observer.qSat[6] color:blend(#red,#green,1-6.0/8);
+				data "Q7" value:main_observer.qSat[7] color:blend(#red,#green,1-7.0/8);
+				data "Q8" value:main_observer.qSat[8] color:#green;
 			}
 		}
 		display "satisfaction x age" {
@@ -410,7 +405,8 @@ experiment abstract_batch virtual:true type:batch until:world.stop_sim() {
 		type:csv to:output_file rewrite:true header:false;
 		
 		ask simulations {
-			save [int(self),self.s_index,self.g_index,self.a_index]+self.main_observer.qSat
+			save [int(self),self.s_index_batch,self.g_index_batch,self.a_index_batch]
+				 +self.main_observer.qSat
 				+[self.main_observer.gSat["W"][MOMENTS index_of MIN],
 					self.main_observer.gSat["W"][MOMENTS index_of AVR],
 					self.main_observer.gSat["W"][MOMENTS index_of MAX]
