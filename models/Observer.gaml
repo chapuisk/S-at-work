@@ -114,7 +114,7 @@ global {
 		float pvalue_ac <- 0.0; //tTest(pac,eac);
 		
 		if first(below_c.parameters) < 0 { res <- res + 1; }
-		if first(above_c.parameters) > 0 { res <- res + 2; }
+		if first(above_c.parameters) > 0 { res <- res + 1; }
 		
 		return res*(1-pvalue_bc)*(1-pvalue_ac)/2;
 	}
