@@ -49,8 +49,6 @@ global {
 		}
 	}
 	
-	reflex observ { if stop_sim() {main_observer.triggered <- true; if not(batch_mode) {do pause;}} }
-	
 }
 
 experiment test parent:abstract_xp type:gui { }

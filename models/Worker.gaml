@@ -353,7 +353,9 @@ species worker parent:individual {
 	 */
 	float get_organizational_kinship(individual i) {
 		float kinship;
-		if type_of(i) is worker and my_work.org = worker(i).my_work.org {
+		if relatives contains i or friends contains i {
+			kinship <- 1.0;
+		} else if type_of(i) is worker and my_work.org = worker(i).my_work.org {
 			kinship <- 1 / ((my_work.org.get_distance(my_work,worker(i).my_work) + DEFAULT_HORIZONTAL_DISTANCE_UNIT=0?1:0 )^org_kindship_factor);
 		} else {
 			kinship <- 0.0;

@@ -28,8 +28,10 @@ global {
 	characteristic EDUCATION;
 	characteristic FAMILY;
 	
+	int MAX_AGE <- 80;
+	
 	action init_demographic_characteristic {
-		create num_characteristic returns:ca with:[name::"age",gama_type::"int", ambiguity::MIDDLE_AMBIGUITY, min::0, max::120]; AGE <- first(ca);
+		create num_characteristic returns:ca with:[name::"age",gama_type::"int", ambiguity::MIDDLE_AMBIGUITY, min::0, max::MAX_AGE]; AGE <- first(ca);
 		create nominal_characteristic returns:cg with:[name::"gender",gama_type::"string", ambiguity::LOW_AMBIGUITY, values::["M","W","O"]]; GENDER <- first(cg);
 		create ordered_characteristic returns:ce with:[name::"education",gama_type::"string", ambiguity::MIDDLE_AMBIGUITY, values::[
 																				"No education completed",

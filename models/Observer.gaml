@@ -17,6 +17,7 @@ global {
 	
 	// Constants for observers
 	string MIN <- "min"; string MAX <- "max"; string MED <- "median"; string AVR <- "mean"; string STD <- "std";
+	list<string> MOMENTS <- [MIN,MAX,MED,AVR,STD];
 		
 	// INIT OBSERVER
 	action init_observer {
@@ -43,6 +44,10 @@ global {
 	bool stop_sim(float epsilon <- EPSILON) {
 		do syso(sample(sats),level::debug_level(0)); 
 		bool stop <- sats none_matches (length(each) < windows or abs(min(each) - max(each)) > epsilon);
+		if stop {
+			ask main_observer {do end_outputs;}
+			if batch_mode { ask main_observer { do update_qSat; do update_aSat; do update_gSat; } }
+		}
 		return stop;
 	}
 	
@@ -57,26 +62,47 @@ global {
 	 * </ul> <p>
 	 * closest index to 0 means a good fit, closest to 2 means a poor fit 
 	 */
-	float sat_dist_index(observer obs) {
+	float sat_dist_index(observer obs, bool std_based <- true) {
 		if obs.quantiles=nil or empty(obs.quantiles) {return -1;}
 		float i; // the index
-		list<float> std_percentiles <- obs.quantiles collect (each[obs.stat_profile index_of STD]);
+		
+		list<float> i_percentiles;
+		
+		if std_based { i_percentiles <- obs.quantiles collect (each[MOMENTS index_of STD]); }
+		else {i_percentiles <- obs.quantiles collect (
+			each[MOMENTS index_of MIN] - each[MOMENTS index_of MAX]
+		);}
+		
+		do syso(sample(i_percentiles));
 		
 		// least deviatives percentile
-		int idx_least_std <- (std_percentiles index_of min(std_percentiles)); 
+		int idx_least_std <- (i_percentiles index_of (i_percentiles min_of abs(each)));
+		do syso(sample(idx_least_std));
+		int idx_theoretic_least_std <- int(length(i_percentiles) * 0.75);
 		
 		// Peak should be close to 0.75 percentile
-		i <- abs(idx_least_std / length(std_percentiles) - 0.75);
+		i <- 1 - abs(idx_least_std / length(i_percentiles) - 0.75);
 		
 		// How std curve fits u-shape
-		int curve_dist;
-		loop idx from:0 to:length(std_percentiles)-2 {
-			if idx < idx_least_std { if std_percentiles[idx] > std_percentiles[idx+1] {curve_dist <- curve_dist+1;} }
-			else { if std_percentiles[idx] < std_percentiles[idx+1] {curve_dist <- curve_dist+1;} }
+		regression below_c <- nil;
+		if idx_least_std>0 {
+			matrix<float> mat_b <- {2,idx_least_std+1} matrix_with 0.0;
+			loop idx from:0 to:idx_least_std {mat_b[0,idx] <- idx; mat_b[1,idx] <- i_percentiles[idx];}
+			do syso(string(mat_b));
+			regression below_c <- build(mat_b);
+			do syso(sample(below_c));
 		}
-		i <- i + 1-curve_dist/(length(std_percentiles)-1);
 		
-		return i;
+		regression above_c <- nil;
+		if length(i_percentiles)-idx_least_std>1 {
+			matrix<float> mat_a <- {2,length(i_percentiles)-idx_least_std} matrix_with 0.0;
+			loop idx from:0 to:length(i_percentiles)-idx_least_std-1 {mat_a[0,idx] <- idx; mat_a[1,idx] <- i_percentiles[idx+idx_least_std];}
+			do syso(string(mat_a));
+			regression above_c <- build(mat_a);
+			do syso(sample(above_c));
+		}
+		
+		return i * ((below_c = nil or below_c.parameters[1] < 0 ? 0.5 : 0.0) + (above_c = nil or above_c.parameters[1] > 0 ? 0.5 : 0.0)) ;
 	} 
 	
 	// #########################
@@ -113,51 +139,59 @@ global {
 		loop r over:rows_list(p.value) { pac <+ last(r); eac <+ predict(above_c,[first(r)]); }
 		float pvalue_ac <- 0.0; //tTest(pac,eac);
 		
-		if first(below_c.parameters) < 0 { res <- res + 1; }
-		if first(above_c.parameters) > 0 { res <- res + 2; }
+		if below_c.parameters[1] < 0 { res <- res + 1; }
+		if above_c.parameters[1] > 0 { res <- res + 2; }
 		
 		return res*(1-pvalue_bc)*(1-pvalue_ac)/2;
 	}
-	
-	float age_index(observer obs, int y <- 25, int e <- 55) {
-		if obs.age_distribution=nil or empty(obs.age_distribution) {return -1;}
-		list<float> young <- []; list<float> mid <- []; list<float> elder <- [];
-		loop age over:obs.age_distribution.keys {
-			float m <- obs.age_distribution[age][obs.stat_profile index_of AVR];
-			if age < y { young <+ m;} else if age < e { mid <+ m;} else { elder <+ m;}
-		}
-		return (young count (each > max(mid)) / (1.0*length(young))) * (mid count (each < min(elder)) / (1.0*length(mid))); 
-	}
+
 }
 
 species observer {
 	
-	list<string> stat_profile <- [MIN,MAX,MED,AVR,STD];
 	list<worker> target_agents;
 	list<float> overall_profile;
 	
 	// Job satisfaction distribution
 	// each Q = min,max,median,mean,std
 	list<list<float>> quantiles;
+	// Flat quantile mean satisfaction
+	list<float> qSat <- list_with(q_number,0.0);
 	
 	// Women vs men
 	list<pair<int,float>> gender_sat;
+	// MIN, AVR, MAX for each gender
+	map<string,list<float>> gSat <- [];
 	
 	// U-shape with age
 	// each age = min,max,median,mean,std
 	map<int,list<float>> age_distribution;
+	// Age range average satisfaction
+	map<pair<int,int>,float> aSat <- [];
 	
-	int freq <- 0;
+	// ------------------------------ //
+	// REFLEXES
+
+	int freq <- 1;
+
+	/*
+	 * Step wise output computation
+	 * Update outputs
+	 */
+	reflex step_outputs when:not batch_mode and every(freq) { do update_qSat; do update_aSat; do update_gSat; }
+	
+	// ------------------------------ //
+	// END SIM
+	
 	bool triggered <- false;
 	
 	/*
 	 * The method that observe what happens in the simulation
 	 */
-	reflex observe when:every(freq) and triggered {
+	action end_outputs {
+		triggered <- true;
 		// Overall
 		overall_profile <- statistic_profile(target_agents collect (each._job_satisfaction));
-		
-		ask world {do syso(sample(every(myself.freq) and myself.triggered));}
 		
 		// Quantiles
 		quantiles <- [];
@@ -172,15 +206,17 @@ species observer {
 		map<int,list<worker>> age_workers <- target_agents group_by (each.numerical(AGE));
 		loop age over:age_workers.keys { age_distribution[age] <- statistic_profile(age_workers[age] collect (each._job_satisfaction)); }
 		
-		
 	}
+	
+	// ------------------------------ //
+	// UTILS
 	
 	/*
 	 * Build the statistic profile
 	 */
-	action statistic_profile(list<float> values) {
+	list<float> statistic_profile(list<float> values, list<string> moments <- MOMENTS) {
 		list<float> sp <- [];
-		loop s over:stat_profile {
+		loop s over:moments {
 			switch s {
 				match MIN { sp <+ min(values); }
 				match MAX { sp <+ max(values); }
@@ -190,6 +226,17 @@ species observer {
 			}
 		}
 		return sp;
+	}
+	
+	/*
+	 * Return a given moment of quantiles value
+	 */
+	list<float> quantile_moment(list<float> values, string moment) {
+		list<float> res <- [];
+		if length(remove_duplicates(values)) < q_number {return list_with(q_number,0.0);}
+		list<list<float>> all_sat_sorted <- list<list<float>>(values split_in q_number);
+		loop q over:all_sat_sorted {res <+ first(statistic_profile(q,[moment]));}
+		return res;
 	}
 	
 	/*
@@ -209,4 +256,22 @@ species observer {
 			
 		return bc::ac;
 	 }
+	 
+	// ------------------------------ //
+	// INNER ACTIONS
+	
+	action update_qSat { qSat <- quantile_moment(worker collect each._job_satisfaction,STD); }
+	
+	action update_aSat(list<pair<int,int>> age_range <- [pair(0::25),pair(25::35),pair(35::45),pair(45::55),pair(55::65),pair(65::MAX_AGE)]) { 
+		loop k over:age_range {
+			aSat[pair<int,int>(k)] <- mean(worker where (each.numerical(AGE) >= int(k.key) 
+				and each.numerical(AGE) < int(k.value)) collect (each._job_satisfaction));
+		}
+	}
+	
+	action update_gSat {
+		loop g over:GENDER.get_space() {
+			gSat[g] <- statistic_profile( worker where (each.get(GENDER)=g) collect (each._job_satisfaction) );
+		}
+	}
 }

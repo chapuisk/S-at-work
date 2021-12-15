@@ -30,7 +30,7 @@ global {
 	nominal_characteristic CONTRACT;
 	string contract <- "contract time";
 	list<string> default_contract_types <- ["short term","long term"];
-	map<string,float> contract_types_weights <- ["short term"::0.1,"long term"::0.9];
+	map<string,float> contract_types_weights <- [default_contract_types[0]::0.105,default_contract_types[1]::0.895]; // temporary employement Eurostats
 	
 	// Job characteristic model : Hackman & Oldam
 	// https://www.sciencedirect.com/science/article/pii/S1877042814028286/pdf?md5=d22856a61e08683d63419dfdf7ba5483&pid=1-s2.0-S1877042814028286-main.pdf
@@ -84,7 +84,8 @@ global {
 	
 	// Create the simplest work comprising 'nb_tasks' inner tasks and basic work characteristics (i.e. salary, working time and contract)
 	work create_simple_work(int nb_tasks <- 0, pair<int,int> salary_range <- nil, 
-		pair<float,float> working_hours <- avr_working_hours::std_working_hours, map<string,float> contract_weight <- contract_types_weights 
+		pair<float,float> working_hours <- avr_working_hours::std_working_hours, 
+		map<string,float> contract_weight <- contract_types_weights 
 	) {
 		create task number:nb_tasks returns:t;
 		int s <- int(SALARY.get_numerical_value(first(SALARY.get_space())));
@@ -117,7 +118,7 @@ global {
 		if ts=nil {create task returns:t; ts <- t;}
 		
 		
-		create work with:[tasks::ts,salary::s,working_time_per_week::wt,contract::any(CONTRACT.get_space())] returns:res;
+		create work with:[tasks::ts,salary::s,working_time_per_week::wt,contract::rnd_choice(contract_types_weights)] returns:res;
 		work the_work <- first(res);
 		w.my_work <- the_work;
 		return first(res);

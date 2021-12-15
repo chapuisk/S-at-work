@@ -26,14 +26,8 @@ global {
 	// CONSTANTS
 	float EPSILON <- 1e-6 const:true;
 	
-	// BATCH MODE
-	bool batch_mode <- false;
-	
 	// #####################
 	// PARAMETERS
-	
-	// Debug
-	string LEVEL init:"DEBUG" parameter:true among:["TRACE","DEBUG","WARNING","ERROR"] category:"Utils";
 	
 	// Input
 	int nb_agent init:1000 parameter:true category:"Agent init";
@@ -120,7 +114,7 @@ global {
 		do init_observer;
 		do last_init;
 		do syso("End init - total time equals "
-			+with_precision((machine_time-t/1000),2)+"s"
+			+with_precision(((machine_time-t)/1000),2)+"s"
 		);
 	}
 	
@@ -292,11 +286,26 @@ global {
 		];
 	}
 	
+	// ------------------------------------------- //
+	// ------------------- SIM ------------------- //
+
+	// BATCH MODE
+	bool batch_mode <- false;
+	string output_file <- "batch_output/results.csv";
+
+	/*
+	 * Trigger output computation and stop simulation if not batch mode
+	 */
+	reflex observ when:not(batch_mode) and stop_sim() {}
+	
 	// -------------------------------------------- //
 	// ------------------- LOGS ------------------- //
 	// 
 	// TODO : make it possible to print log in files
 	// 
+	
+	// Debug
+	string LEVEL init:"DEBUG" parameter:true among:["TRACE","DEBUG","WARNING","ERROR"] category:"Utils";
 	
 	//========//
 	// LOGGER //
@@ -305,6 +314,10 @@ global {
 	bool DEBUG_MOD <- false;
 	list<string> debug_levels <- ["TRACE","DEBUG","WARNING","ERROR"];
 	
+	/*
+	 * Print things in the console in a consistant way
+	 * TODO : turn piece of console output into proper log file
+	 */
 	action syso(string msg, float benchmark_time <- -1.0, agent caller <- self, string action_name <- nil, string level <- LEVEL) {
 		if DEBUG_MOD and (debug_levels index_of level >= debug_levels index_of LEVEL) {
 			string m <- "["+caller.name+(action_name=nil?"":"|"+action_name)+"]"
@@ -337,9 +350,76 @@ experiment "abstract_xp" virtual:true type:gui {
 				}
 			}
 		}
-		monitor "sat distribution" value:s_index;
+		display "satisfaction distribution" {
+			chart "satisfaction std" type:histogram {
+				data "Q0" value:main_observer.qSat[0] color:#red;
+				data "Q1" value:main_observer.qSat[1] color:blend(#red,#green,1-1.0/9);
+				data "Q2" value:main_observer.qSat[2] color:blend(#red,#green,1-2.0/9);
+				data "Q3" value:main_observer.qSat[3] color:blend(#red,#green,1-3.0/9);
+				data "Q4" value:main_observer.qSat[4] color:blend(#red,#green,1-4.0/9);
+				data "Q5" value:main_observer.qSat[5] color:blend(#red,#green,1-5.0/9);
+				data "Q6" value:main_observer.qSat[6] color:blend(#red,#green,1-6.0/9);
+				data "Q7" value:main_observer.qSat[7] color:blend(#red,#green,1-7.0/9);
+				data "Q8" value:main_observer.qSat[8] color:blend(#red,#green,1-8.0/9);
+				data "Q9" value:main_observer.qSat[9] color:#green;
+			}
+		}
+		display "satisfaction x age" {
+			chart "satisfaction with age" type:histogram {
+				data "<25" value:main_observer.aSat[pair<int,int>(0::25)] color:#gold;
+				data ">=25<35" value:main_observer.aSat[pair<int,int>(25::35)] color:blend(#gold,#brown,1-1/5);
+				data ">=35<45" value:main_observer.aSat[pair<int,int>(35::45)] color:blend(#gold,#brown,1-2/5);
+				data ">=45<55" value:main_observer.aSat[pair<int,int>(45::55)] color:blend(#gold,#brown,1-3/5);
+				data ">=55<65" value:main_observer.aSat[pair<int,int>(55::65)] color:blend(#gold,#brown,1-4/5);
+				data ">=65" value:main_observer.aSat[pair<int,int>(65::MAX_AGE)] color:#brown;
+			}
+		}
+		display "satisfaction x gender" {
+			chart "satisfaction with gender" type:histogram {
+				data "Women MIN" value:main_observer.gSat["W"][MOMENTS index_of MIN];
+				data "Women AVR" value:main_observer.gSat["W"][MOMENTS index_of AVR];
+				data "Women MAX" value:main_observer.gSat["W"][MOMENTS index_of MAX];
+				data "Men MIN" value:main_observer.gSat["M"][MOMENTS index_of MIN];
+				data "Men AVR" value:main_observer.gSat["M"][MOMENTS index_of AVR];
+				data "Men MAX" value:main_observer.gSat["M"][MOMENTS index_of MAX];
+			} 
+		}
+ 		monitor "sat distribution" value:s_index;
 		monitor "sat gender" value:g_index;
 		monitor "sat age" value:a_index;
 	}
+}
+
+experiment abstract_batch virtual:true type:batch until:world.stop_sim() {
+	
+	init { batch_mode <- true; } 
+	
+	/*
+	 * Main output of the simulation without parameters
+	 */
+	reflex end_batch {
+		
+		save ["Sim id","s index","g index","a index",
+			"sq1","sq2","sq3","sq4","sq5","sq6","sq7","sq8","sq9","sq10",
+			"wmin","wavr","wmax","mmin","mavr","mmax",
+			"a25","a35","a45","a55","a65","a"+MAX_AGE] 
+		type:csv to:output_file rewrite:true header:false;
+		
+		ask simulations {
+			save [int(self),s_index,g_index,a_index]+main_observer.qSat
+				+[main_observer.gSat["W"][MOMENTS index_of MIN],
+					main_observer.gSat["W"][MOMENTS index_of AVR],
+					main_observer.gSat["W"][MOMENTS index_of MAX]
+				]
+				+[main_observer.gSat["M"][MOMENTS index_of MIN],
+					main_observer.gSat["M"][MOMENTS index_of AVR],
+					main_observer.gSat["M"][MOMENTS index_of MAX]
+				]
+				+main_observer.aSat 
+			type:csv to:output_file rewrite:false;
+		}
+		
+	}
+	
 }
 
