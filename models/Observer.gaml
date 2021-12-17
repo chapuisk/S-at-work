@@ -51,6 +51,8 @@ global {
 				s_index_batch <- sat_dist_index(main_observer);
 				g_index_batch <- gender_pearson(main_observer);
 				a_index_batch <- age_pseudo_two_lines_index(main_observer); 
+				avr_sat_batch <- mean(worker collect (each._job_satisfaction));
+				end_cycle_batch <- cycle;
 			}
 		}
 		return stop;
@@ -78,11 +80,11 @@ global {
 			each[MOMENTS index_of MIN] - each[MOMENTS index_of MAX]
 		);}
 		
-		do syso(sample(i_percentiles));
+		do syso(sample(i_percentiles),level::debug_levels[0]);
 		
 		// least deviatives percentile
 		int idx_least_std <- (i_percentiles index_of (i_percentiles min_of abs(each)));
-		do syso(sample(idx_least_std));
+		do syso(sample(idx_least_std),level::debug_levels[0]);
 		int idx_theoretic_least_std <- int(length(i_percentiles) * 0.75);
 		
 		// Peak should be close to 0.75 percentile
@@ -90,24 +92,32 @@ global {
 		
 		// How std curve fits u-shape
 		regression below_c <- nil;
+		float pvb;
 		if idx_least_std>0 {
 			matrix<float> mat_b <- {2,idx_least_std+1} matrix_with 0.0;
 			loop idx from:0 to:idx_least_std {mat_b[0,idx] <- idx; mat_b[1,idx] <- i_percentiles[idx];}
-			do syso(sample(mat_b));
+			do syso(sample(mat_b),level::debug_levels[0]);
 			below_c <- build(mat_b);
-			do syso(sample(below_c));
+			do syso(sample(below_c),level::debug_levels[0]);
+			list b <- []; list bp <- [];
+			loop r over:rows_list(mat_b) { b <+ last(r); bp <+ predict(below_c,[first(r)]); }
+			pvb <- tTest(b,bp);
 		}
 		
 		regression above_c <- nil;
+		float pva;
 		if length(i_percentiles)-idx_least_std>1 {
 			matrix<float> mat_a <- {2,length(i_percentiles)-idx_least_std} matrix_with 0.0;
 			loop idx from:0 to:length(i_percentiles)-idx_least_std-1 {mat_a[0,idx] <- idx; mat_a[1,idx] <- i_percentiles[idx+idx_least_std];}
-			do syso(sample(mat_a));
+			do syso(sample(mat_a),level::debug_levels[0]);
 			above_c <- build(mat_a);
-			do syso(sample(above_c));
+			do syso(sample(above_c),level::debug_levels[0]);
+			list a <- []; list ap <- [];
+			loop r over:rows_list(mat_a) { a <+ last(r); ap <+ predict(above_c,[first(r)]); }
+			pva <- tTest(a,ap);
 		}
 		
-		return i * ((below_c = nil or below_c.parameters[1] < 0 ? 0.5 : 0.0) + (above_c = nil or above_c.parameters[1] > 0 ? 0.5 : 0.0)) ;
+		return i * (((below_c = nil or below_c.parameters[1] < 0 ? 1-pvb : 0.0) + (above_c = nil or above_c.parameters[1] > 0 ? 1-pvb : 0.0)))/2 ;
 	} 
 	
 	// #########################
@@ -129,25 +139,30 @@ global {
 	// #########################
 	// AGE SATISFACTION DISTRIBUTION
 	
-	float age_pseudo_two_lines_index(observer obs, int c <- 55) {
+	float age_pseudo_two_lines_index(observer obs, int c <- 55, int c_flat <- 5) {
 		if not(obs.triggered) {return 0.0;}
 		pair p <- obs.get_age_matrix(c); 
 		regression below_c <- build(p.key);
 		regression above_c <- build(p.value);
 		
-		float res;
+		float sb <- mean((worker where (each.numerical(AGE) >= c-c_flat 
+			and each.numerical(AGE) <= c+c_flat)) collect (each._job_satisfaction));
+		float sbm <- mean((worker where (each.numerical(AGE) < c-c_flat)) collect (each._job_satisfaction));
+		float sbp <- mean((worker where (each.numerical(AGE) > c+c_flat)) collect (each._job_satisfaction));
+		
+		float res <- sb<sbm?(sb<sbp?1:0.5):0.0;
 		
 		list pbc <- []; list ebc <- [];
 		loop r over:rows_list(p.key) { pbc <+ last(r); ebc <+ predict(below_c,[first(r)]); } 
-		float pvalue_bc <- 0.0;// tTest(pbc,ebc);
+		float pvalue_bc <- tTest(pbc,ebc);
 		list pac <- []; list eac <- [];
 		loop r over:rows_list(p.value) { pac <+ last(r); eac <+ predict(above_c,[first(r)]); }
-		float pvalue_ac <- 0.0;// tTest(pac,eac);
+		float pvalue_ac <- tTest(pac,eac);
 		
-		if first(below_c.parameters) < 0 { res <- res + 1; }
-		if first(above_c.parameters) > 0 { res <- res + 1; }
+		if first(below_c.parameters) < 0 { res <- res + 1 - pvalue_bc; }
+		if first(above_c.parameters) > 0 { res <- res + 1 - pvalue_ac; }
 		
-		return res*(1-pvalue_bc)*(1-pvalue_ac)/2;
+		return res/3;
 	}
 
 }
@@ -252,10 +267,10 @@ species observer {
 	/*
 	 * Return a given moment of quantiles value
 	 */
-	list<float> quantile_moment(list<float> values, string moment) {
+	list<float> quantile_moment(list<float> values, string moment, int quanta <- q_number) {
 		list<float> res <- [];
-		list<list<float>> all_sat_sorted <- partitions(values, q_number);
-		if length(all_sat_sorted) != q_number {error "Partitions operator return "+length(all_sat_sorted)+ " split, while asked for "+q_number;}
+		list<list<float>> all_sat_sorted <- partitions(values, quanta);
+		if length(all_sat_sorted) != quanta {error "Partitions operator return "+length(all_sat_sorted)+ " split, while asked for "+quanta;}
 		loop q over:all_sat_sorted {res <+ first(statistic_profile(q,[moment]));}
 		return res;
 	}

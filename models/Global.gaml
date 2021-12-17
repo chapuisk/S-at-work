@@ -26,6 +26,9 @@ global {
 	float a_index -> age_pseudo_two_lines_index(main_observer);
 	float a_index_batch;
 	
+	float avr_sat_batch;
+	int end_cycle_batch;
+	
 	// CONSTANTS
 	float EPSILON <- 1e-6 const:true;
 	
@@ -43,6 +46,10 @@ global {
 	
 	// Cog
 	int default_agent_memory <- 5; // length of sat memory (for peak-end)
+	
+	// 5-traits
+	float extra_selection <- 0.0 parameter:true min:0.0 max:1.0 category:"Personality"; // Tendency to reject middle judgement (average satisfaction)
+	float consceint_somthing; // TODO find correlations between _c and job evaluation
 	
 	// W-OWA
 	float default_neu_rho <- 0.0 parameter:true min:0.0 max:1.0 category:"W-OWA"; // strenght of neuroticism on wowa: over weight the least satisfiying aspects of job
@@ -64,6 +71,7 @@ global {
 	// Network
 	graph sn;
 	string net_type <- "Random" among:["Random","ScaleFree","SmallWorld"];
+	int net_type_sobol <- -1;
 	
 	int erdos_renyi_k <- 4 min:1 max:20;
 	
@@ -141,6 +149,7 @@ global {
 	// INIT OF SOCIAL CONNECTIONS
 	action init_network {
 		float t <- machine_time;
+		if net_type = nil and net_type_sobol != -1 {net_type <- ["Random","ScaleFree","SmallWorld"][net_type_sobol];}
 		switch net_type {
 			match "Random" { 
 				sn <- generate_random_graph(length(worker),length(worker)*erdos_renyi_k,false,noeud,lien);
@@ -180,7 +189,7 @@ global {
 			// Remove workers that have been assigned a job and an organization
 			a >>- o.workers;
 		}
-		
+		ask organization where (empty(each.workers)) {do die;} // TODO why I have to do that ?
 	}
 	
 	// Can add something before global init overloading the method
@@ -397,15 +406,16 @@ experiment abstract_batch virtual:true type:batch until:world.stop_sim() {
 	 * Main output of the simulation without parameters
 	 */
 	reflex end_batch {
-		if int(first(simulations))=0 {
-			save ["Sim id","end cycle","s index","g index","a index",
-				"sq1","sq2","sq3","sq4","sq5","sq6","sq7","sq8","sq9","sq10",
-				"wmin","wavr","wmax","mmin","mavr","mmax",
-				"a25","a35","a45","a55","a65","a"+MAX_AGE] 
-			type:csv to:output_file rewrite:true header:false;
-		}
+		
+		save ["Sim id","end cycle","avr sat","s index","g index","a index",
+			"sq1","sq2","sq3","sq4","sq5","sq6","sq7","sq8","sq9","sq10",
+			"wmin","wavr","wmax","mmin","mavr","mmax",
+			"a25","a35","a45","a55","a65","a"+MAX_AGE] 
+		type:csv to:output_file rewrite:true header:false;
+		
 		ask simulations {
-			save [int(self),self.cycle,self.s_index_batch,self.g_index_batch,self.a_index_batch]
+			save [int(self),self.end_cycle_batch,self.avr_sat_batch,
+				self.s_index_batch,self.g_index_batch,self.a_index_batch]
 				 +self.main_observer.qSat
 				+[self.main_observer.gSat["W"][MOMENTS index_of MIN],
 					self.main_observer.gSat["W"][MOMENTS index_of AVR],

@@ -289,7 +289,7 @@ species worker parent:individual {
 		float t;
 		if DEBUG_WORKER and DEBUG_TARGET contains self {t <- machine_time;}
 		
-		// Assess one job's characteristics impact based on vitamin model
+		// Assess one job's characteristics impact based on warr's model
 		map<characteristic, pair<float,float>> val_weights <- [];
 		loop wc over:WORK_CHARACTERISTICS {
 			val_weights[wc] <- get_warr_factor(wc,_work_aspects[wc], work_evaluator[wc][1], work_evaluator[wc][2], work_evaluator[wc][3])::work_evaluator[wc][0];
@@ -319,6 +319,15 @@ species worker parent:individual {
 	list<worker> __social_references;
 	float org_kindship_factor <- 1.0; // How close from my point i evaluate people from my own organization - 1 is neutral value (linear over network distance)
 	
+	// TODO : put _e as an antecedent of the number of social references
+	// Trying to compare with people with poor or high satisfaction
+	float ext_mode <- extra_selection;
+	
+	/*
+	 * How much bad experience is weighted upon work characteristic evaluation
+	 */
+	float extravert_social_ref(float extra <- ext_mode) { return _e / minmax_e.value * extra; }
+	
 	/*
 	 * Update the list of social references
 	 */
@@ -341,6 +350,10 @@ species worker parent:individual {
 			else if flip(colleagues_factor) {sr <+ e;}
 		}
 		// -------
+		
+		float thresh <- extravert_social_ref();
+		sr <- sr where (abs(_job_satisfaction - each._job_satisfaction) / _job_satisfaction > thresh or flip(1-ext_mode));
+		
 		
 		if DEBUG_WORKER and t != 0 { ask world { do syso(sample(sr),machine_time-t,myself,"update_social_references",debug_level(0)); } }
 		return sr;
