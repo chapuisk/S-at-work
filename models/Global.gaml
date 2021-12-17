@@ -109,12 +109,12 @@ global {
 		do syso("- Create social network");
 		do init_network;
 		do syso("-- "+length(sn.vertices)+" nodes and "+length(sn.edges)+" edges"
-			+"\n\t average degree: "+mean(worker collect (sn degree_of each))
+			+"\n\t average degree: "+mean(noeud collect (sn degree_of each))
 			+"\n\t alpha (prop of cycles): "+alpha_index(sn)
 			+"\n\t gamma (prop of links): "+gamma_index(sn)
 		);
-		sn <- nil;
-		ask lien {do die;} ask noeud {do die;}
+		// Delete network because unspecified network does not work in Gama
+		sn <- nil; ask lien {do die;} ask noeud {do die;}
 		do syso("- Init observer and outcomes");
 		do init_observer;
 		do last_init;
@@ -397,15 +397,15 @@ experiment abstract_batch virtual:true type:batch until:world.stop_sim() {
 	 * Main output of the simulation without parameters
 	 */
 	reflex end_batch {
-		
-		save ["Sim id","s index","g index","a index",
-			"sq1","sq2","sq3","sq4","sq5","sq6","sq7","sq8","sq9","sq10",
-			"wmin","wavr","wmax","mmin","mavr","mmax",
-			"a25","a35","a45","a55","a65","a"+MAX_AGE] 
-		type:csv to:output_file rewrite:true header:false;
-		
+		if int(first(simulations))=0 {
+			save ["Sim id","end cycle","s index","g index","a index",
+				"sq1","sq2","sq3","sq4","sq5","sq6","sq7","sq8","sq9","sq10",
+				"wmin","wavr","wmax","mmin","mavr","mmax",
+				"a25","a35","a45","a55","a65","a"+MAX_AGE] 
+			type:csv to:output_file rewrite:true header:false;
+		}
 		ask simulations {
-			save [int(self),self.s_index_batch,self.g_index_batch,self.a_index_batch]
+			save [int(self),self.cycle,self.s_index_batch,self.g_index_batch,self.a_index_batch]
 				 +self.main_observer.qSat
 				+[self.main_observer.gSat["W"][MOMENTS index_of MIN],
 					self.main_observer.gSat["W"][MOMENTS index_of AVR],
