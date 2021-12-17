@@ -7,10 +7,10 @@
 
 model SobolAnalysis
 
-import "../Global.gaml"
+import "../../Global.gaml"
 
 global {
-	string output_file <- "../../batch_output/Sobol_zero.csv";
+	string output_file <- "../../../batch_output/Sobol_zero.csv";
 	bool DEBUG_MOD <- true;
 	
 	action init_organization {

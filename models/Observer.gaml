@@ -18,6 +18,7 @@ global {
 	// Constants for observers
 	string MIN <- "min"; string MAX <- "max"; string MED <- "median"; string AVR <- "mean"; string STD <- "std";
 	list<string> MOMENTS <- [MIN,MAX,MED,AVR,STD];
+	list<pair<int,int>> AGE_RANGE_OBS <- list<pair<int, int>>([pair(0::25),pair(25::35),pair(35::45),pair(45::55),pair(55::65),pair(65::MAX_AGE)]);
 		
 	// INIT OBSERVER
 	action init_observer {
@@ -33,16 +34,15 @@ global {
 	
 	// Satisfaction equilibrium
 	reflex equilibrium {
-		if sats=nil or empty(sats) { sats <- list_with(length(worker),list<float>([])); }
-		ask worker { 
+		if sats=nil or empty(sats) { sats <- []; loop times:length(worker) {sats <+ [];} }
+		ask worker {
 			sats[int(self)] <+ _job_satisfaction;
 			if length(sats[int(self)]) > windows { sats[int(self)][] >- 0; }
 		}
 	}
 	
 	// stop the simulation if satisfaction does not move more than 'epsilon' in a 'windows' time frame for every agent
-	bool stop_sim(float epsilon <- EPSILON) {
-		do syso(sample(sats),level::debug_level(0)); 
+	bool stop_sim(float epsilon <- EPSILON) { 
 		bool stop <- sats none_matches (length(each) < windows or abs(min(each) - max(each)) > epsilon);
 		if stop {
 			ask main_observer {do end_outputs;}
@@ -181,13 +181,13 @@ species observer {
 	// Women vs men
 	list<pair<int,float>> gender_sat;
 	// MIN, AVR, MAX for each gender
-	map<string,list<float>> gSat <- [];
+	map<string,list<float>> gSat <- GENDER.get_space() as_map (each::list_with(length(MOMENTS),0.0));
 	
 	// U-shape with age
 	// each age = min,max,median,mean,std
 	map<int,list<float>> age_distribution;
 	// Age range average satisfaction
-	map<pair<int,int>,float> aSat <- [];
+	map<pair<int,int>,float> aSat <- AGE_RANGE_OBS as_map (each::0.0);
 	
 	// ------------------------------ //
 	// REFLEXES
@@ -298,7 +298,7 @@ species observer {
 	
 	action update_qSat { qSat <- quantile_moment(worker collect each._job_satisfaction,STD); }
 	
-	action update_aSat(list<pair<int,int>> age_range <- [pair(0::25),pair(25::35),pair(35::45),pair(45::55),pair(55::65),pair(65::MAX_AGE)]) { 
+	action update_aSat(list<pair<int,int>> age_range <- AGE_RANGE_OBS) { 
 		loop k over:age_range {
 			aSat[pair<int,int>(k)] <- mean(worker where (each.numerical(AGE) >= int(k.key) 
 				and each.numerical(AGE) < int(k.value)) collect (each._job_satisfaction));

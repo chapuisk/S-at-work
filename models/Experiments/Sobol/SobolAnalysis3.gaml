@@ -8,10 +8,10 @@
 
 model SobolAnalysis3
 
-import "../Global.gaml"
+import "../../Global.gaml"
 
 global {
-	string output_file <- "../../batch_output/Sobol_orga_perso.csv";
+	string output_file <- "../../../batch_output/Sobol_orga_perso.csv";
 }
 
 experiment sobol_xplo_2 parent:abstract_batch type:batch until:world.stop_sim(){

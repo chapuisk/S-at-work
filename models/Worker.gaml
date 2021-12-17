@@ -352,7 +352,7 @@ species worker parent:individual {
 		// -------
 		
 		float thresh <- extravert_social_ref();
-		sr <- sr where (abs(_job_satisfaction - each._job_satisfaction) / _job_satisfaction > thresh or flip(1-ext_mode));
+		sr <- sr where (abs(_job_satisfaction - each._job_satisfaction) / (_job_satisfaction+EPSILON) <= thresh or flip(1-ext_mode));
 		
 		
 		if DEBUG_WORKER and t != 0 { ask world { do syso(sample(sr),machine_time-t,myself,"update_social_references",debug_level(0)); } }

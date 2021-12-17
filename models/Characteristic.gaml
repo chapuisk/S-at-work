@@ -80,7 +80,7 @@ species num_characteristic parent:characteristic {
 	
 	float get_numerical_value(string val) {
 		switch gama_type {
-			match "int" {return with_precision(int(val),0);}
+			match "int" {return float(int(val));}
 			match "float" {return float(val);}
 			default {error "Numerical characteristic should be int or float rather than "+gama_type;}
 		}

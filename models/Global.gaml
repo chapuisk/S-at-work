@@ -184,12 +184,11 @@ global {
 			
 			// Create a simple organization
 			organization o <- build_single_position_orga(sub_w.values);
-			o.workers <- sub_a;
+			o.workers <- copy(sub_a);
 			
 			// Remove workers that have been assigned a job and an organization
-			a >>- o.workers;
+			a >>- sub_a;
 		}
-		ask organization where (empty(each.workers)) {do die;} // TODO why I have to do that ?
 	}
 	
 	// Can add something before global init overloading the method
@@ -352,14 +351,14 @@ species lien {} species noeud {}
  */
 experiment "abstract_xp" virtual:true type:gui {
 	output {
-		display "satisfaction" {
+		display "satisfaction" type:java2D {
 			chart "satisfaction" type: series legend_font:font(0.0) series_label_position:none style:line {
 				loop w over:worker {
 					data "sat"+int(w) value:w._job_satisfaction color:rnd_color(int(w)/length(worker)*255);
 				}
 			}
 		}
-		display "satisfaction distribution" {
+		display "satisfaction distribution" type:java2D {
 			chart "satisfaction std" type:histogram {
 				data "Q0" value:main_observer.qSat[0] color:#red;
 				data "Q1" value:main_observer.qSat[1] color:blend(#red,#green,1-1.0/8);
@@ -372,7 +371,7 @@ experiment "abstract_xp" virtual:true type:gui {
 				data "Q8" value:main_observer.qSat[8] color:#green;
 			}
 		}
-		display "satisfaction x age" {
+		display "satisfaction x age" type:java2D {
 			chart "satisfaction with age" type:histogram {
 				data "<25" value:main_observer.aSat[pair<int,int>(0::25)] color:#gold;
 				data ">=25<35" value:main_observer.aSat[pair<int,int>(25::35)] color:blend(#gold,#brown,1-1/5);
@@ -382,7 +381,7 @@ experiment "abstract_xp" virtual:true type:gui {
 				data ">=65" value:main_observer.aSat[pair<int,int>(65::MAX_AGE)] color:#brown;
 			}
 		}
-		display "satisfaction x gender" {
+		display "satisfaction x gender" type:java2D {
 			chart "satisfaction with gender" type:histogram {
 				data "Women MIN" value:main_observer.gSat["W"][MOMENTS index_of MIN];
 				data "Women AVR" value:main_observer.gSat["W"][MOMENTS index_of AVR];
@@ -407,11 +406,13 @@ experiment abstract_batch virtual:true type:batch until:world.stop_sim() {
 	 */
 	reflex end_batch {
 		
-		save ["Sim id","end cycle","avr sat","s index","g index","a index",
-			"sq1","sq2","sq3","sq4","sq5","sq6","sq7","sq8","sq9","sq10",
-			"wmin","wavr","wmax","mmin","mavr","mmax",
-			"a25","a35","a45","a55","a65","a"+MAX_AGE] 
-		type:csv to:output_file rewrite:true header:false;
+		if int(first(simulations))=0 {
+			save ["Sim id","end cycle","avr sat","s index","g index","a index",
+				"sq1","sq2","sq3","sq4","sq5","sq6","sq7","sq8","sq9","sq10",
+				"wmin","wavr","wmax","mmin","mavr","mmax",
+				"a25","a35","a45","a55","a65","a"+MAX_AGE] 
+			type:csv to:output_file rewrite:true header:false;
+		}
 		
 		ask simulations {
 			save [int(self),self.end_cycle_batch,self.avr_sat_batch,
