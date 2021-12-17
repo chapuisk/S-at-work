@@ -15,11 +15,6 @@ import "../Worker.gaml"
 global {
 	
 	bool DEBUG_MOD <- true;
-	
-//	action init_organization {
-//		organization o <- build_single_position_orga(worker collect (create_random_work(each)));
-//		o.workers <- list(worker);
-//	}
 
 	/*
 	 * Bind workers and jobs withtin an organization
