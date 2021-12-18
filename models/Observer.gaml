@@ -24,6 +24,7 @@ global {
 	action init_observer {
 		create observer with:[target_agents::list(worker),freq::1];
 		main_observer <- first(observer);
+		sats <- []; loop times:length(worker) {sats <+ [];}
 	}
 	
 	// ########################
@@ -34,11 +35,7 @@ global {
 	
 	// Satisfaction equilibrium
 	reflex equilibrium {
-		if sats=nil or empty(sats) { sats <- []; loop times:length(worker) {sats <+ [];} }
-		ask worker {
-			sats[int(self)] <+ _job_satisfaction;
-			if length(sats[int(self)]) > windows { sats[int(self)][] >- 0; }
-		}
+		ask worker { list ls <- sats[int(self)]; ls <+ _job_satisfaction; if length(ls) > windows { sats[int(self)] <- ls copy_between (1,windows+1); } }
 	}
 	
 	// stop the simulation if satisfaction does not move more than 'epsilon' in a 'windows' time frame for every agent
@@ -53,6 +50,8 @@ global {
 				a_index_batch <- age_pseudo_two_lines_index(main_observer); 
 				avr_sat_batch <- mean(worker collect (each._job_satisfaction));
 				end_cycle_batch <- cycle;
+			} else {
+				do pause;
 			}
 		}
 		return stop;
