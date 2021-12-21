@@ -52,6 +52,7 @@ global {
 	float consceint_somthing; // TODO find correlations between _c and job evaluation
 	
 	// W-OWA
+	bool default_rnd_wc_weights <- false parameter:true category:"W-OWA";
 	float default_neu_rho <- 0.0 parameter:true min:0.0 max:1.0 category:"W-OWA"; // strenght of neuroticism on wowa: over weight the least satisfiying aspects of job
 	float default_gamma <- 1.0 parameter:true min:0.001 max:1.0 category:"W-OWA"; // weight of weights in wowa
 	
@@ -305,7 +306,7 @@ global {
 	/*
 	 * Trigger output computation and stop simulation if not batch mode
 	 */
-	reflex observ when:not(batch_mode) and stop_sim() {}
+	reflex observ when:not(batch_mode) and stop_sim() {if not(empty(action_benchmark)) {do syso(sample(action_benchmark));} do pause;}
 	
 	// -------------------------------------------- //
 	// ------------------- LOGS ------------------- //
@@ -323,6 +324,8 @@ global {
 	bool DEBUG_MOD <- false;
 	list<string> debug_levels <- ["TRACE","DEBUG","WARNING","ERROR"];
 	
+	map<string,float> action_benchmark <- [];
+	
 	/*
 	 * Print things in the console in a consistant way
 	 * TODO : turn piece of console output into proper log file
@@ -336,6 +339,10 @@ global {
 				match "WARNING" { write m color:#orange; }
 				match "ERROR" { do err(msg,caller,action_name); }
 			}
+		}
+		if action_name != nil and benchmark_time > 0 { 
+			action_benchmark[action_name] <- with_precision(benchmark_time/1000,2) 
+				+ (action_benchmark contains_key action_name ? action_benchmark[action_name] : 0.0); 
 		}
 	}
 	

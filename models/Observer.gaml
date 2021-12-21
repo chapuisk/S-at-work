@@ -49,9 +49,7 @@ global {
 				g_index_batch <- gender_pearson(main_observer);
 				a_index_batch <- age_pseudo_two_lines_index(main_observer); 
 				avr_sat_batch <- mean(worker collect (each._job_satisfaction));
-				end_cycle_batch <- cycle;
-			} else {
-				do pause;
+				end_cycle_batch <- cycle;	
 			}
 		}
 		return stop;

@@ -12,12 +12,12 @@ import "../../Global.gaml"
 
 global {
 	string output_file <- "../../../batch_output/Sobol_orga_perso.csv";
+	string sobol_report <- "../../../batch_output/Sobol_zero.txt";
+	bool default_rnd_wc_weights <- true; // Activate random weigths of work characteristics
 }
 
 experiment sobol_xplo_2 parent:abstract_batch type:batch until:world.stop_sim(){
-	init {
-		net_type <- nil;
-	}
+	init { net_type <- nil; }
 	
 	parameter "gamma" var:default_gamma min:0.0 max:1.0;
 	parameter "number of agent" var:nb_agent min:1000 max:5000;
@@ -28,8 +28,8 @@ experiment sobol_xplo_2 parent:abstract_batch type:batch until:world.stop_sim(){
 	
 	parameter "rho" var:default_neu_rho min:0.0 max:1.0;
 	parameter "epsilon" var:extra_selection min:0.0 max:1.0;
-	parameter "sigma" var:consceint_somthing init:0.0 min:0.0 max:1.0;
+	// parameter "sigma" var:consceint_somthing init:0.0 min:0.0 max:1.0;
 	
-	method sobol sample:2000 outputs:["s_index_batch","a_index_batch","g_index_batch"];
+	method sobol sample:1000 outputs:["s_index_batch","a_index_batch","g_index_batch"] report:sobol_report;
 }
 
