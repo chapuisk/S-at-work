@@ -15,6 +15,7 @@ import "../Worker.gaml"
 global {
 	
 	bool DEBUG_MOD <- true;
+	string LEVEL <- "TRACE";
 
 	/*
 	 * Bind workers and jobs withtin an organization

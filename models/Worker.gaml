@@ -73,7 +73,7 @@ global {
 	/*
 	 * TODO: see in WARR's model to init work characteristic evaluation
 	 */
-	list<float> work_eval(characteristic work_char, bool rnd_weights <- false) {
+	list<float> work_eval(characteristic work_char, bool rnd_weights <- default_rnd_wc_weights) {
 		switch work_char {
 			match SALARY {return [rnd_weights?rnd(0.0,1.0):1.0,truncated_gauss(1.0,1.0),gauss(#e,0.5),0.0];} // Pure vitamine
 			match WORKING_TIME {return [rnd_weights?rnd(0.0,1.0):1.0,truncated_gauss(1.0,1.0),gauss(#e,0.5),rnd(1.0,5.0)];} // Nutriment
