@@ -165,7 +165,7 @@ species organization {
 		position p2 <- get_position(w2);
 		if p1 = p2 {return DEFAULT_HORIZONTAL_DISTANCE_UNIT;} 
 		list<orga_link> p <- ( hierarchy path_between (p1.location,p2.location) )
-			.edges collect (get_link(first(each.points),last(each.points))); 
+			.edges collect (get_link_from_points(first(each.points),last(each.points))); 
 		return sum(p accumulate (each.orga_distance));
 	}
 	
@@ -178,7 +178,7 @@ species organization {
 		return hierarchy contains_edge (p1.location::p2.location) ? nil : (orga_link first_with (each.source=p1 and each.destination=p2));
 	}
 	
-	orga_link get_link(point p1, point p2) {
+	orga_link get_link_from_points(point p1, point p2) {
 		return hierarchy contains_edge (p1::p2) ? nil : (orga_link first_with (each.source.location=p1 and each.destination.location=p2));
 	}
 	

@@ -98,7 +98,7 @@ global {
 			do syso(sample(below_c),level::debug_levels[0]);
 			list b <- []; list bp <- [];
 			loop r over:rows_list(mat_b) { b <+ last(r); bp <+ predict(below_c,[first(r)]); }
-			pvb <- tTest(b,bp);
+			pvb <- t_test(b,bp);
 		}
 		
 		regression above_c <- nil;
@@ -111,7 +111,7 @@ global {
 			do syso(sample(above_c),level::debug_levels[0]);
 			list a <- []; list ap <- [];
 			loop r over:rows_list(mat_a) { a <+ last(r); ap <+ predict(above_c,[first(r)]); }
-			pva <- tTest(a,ap);
+			pva <- t_test(a,ap);
 		}
 		
 		return i * (((below_c = nil or below_c.parameters[1] < 0 ? 1-pvb : 0.0) + (above_c = nil or above_c.parameters[1] > 0 ? 1-pvb : 0.0)))/2 ;
@@ -151,10 +151,10 @@ global {
 		
 		list pbc <- []; list ebc <- [];
 		loop r over:rows_list(p.key) { pbc <+ last(r); ebc <+ predict(below_c,[first(r)]); } 
-		float pvalue_bc <- tTest(pbc,ebc);
+		float pvalue_bc <- t_test(pbc,ebc);
 		list pac <- []; list eac <- [];
 		loop r over:rows_list(p.value) { pac <+ last(r); eac <+ predict(above_c,[first(r)]); }
-		float pvalue_ac <- tTest(pac,eac);
+		float pvalue_ac <- t_test(pac,eac);
 		
 		if first(below_c.parameters) < 0 { res <- res + 1 - pvalue_bc; }
 		if first(above_c.parameters) > 0 { res <- res + 1 - pvalue_ac; }
