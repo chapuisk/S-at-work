@@ -18,6 +18,6 @@ global {
 }
 
 experiment stochastic_xp parent:abstract_batch type:batch 
-	repeat:1 until:world.stop_sim(){
-	method explicit parameter_sets:list(range(0,4) collect (["dummy_var"::each]));	
+	repeat:50 until:world.stop_sim(){
+	method explicit parameter_sets:list(range(0,39) collect (["dummy_var"::each]));	
 }
