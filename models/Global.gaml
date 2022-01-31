@@ -139,6 +139,7 @@ global {
 	action init_characteristics {
 		do init_demographic_characteristic;
 		do init_basic_work_carac;
+		do init_eijqi_work_carac;
 	}
 	
 	// INIT OF WORKERS
@@ -180,7 +181,7 @@ global {
 			list sub_a <- n>length(a) ? a : n among a;
 			
 			// Create works according to agent demographics
-			map<worker,work> sub_w <- sub_a as_map (each::create_random_work(each));
+			map<worker,work> sub_w <- sub_a as_map (each::create_eijqi_work(each));
 			loop w over:sub_w.keys {w.my_work <- sub_w[w];} 
 			
 			// Create a simple organization

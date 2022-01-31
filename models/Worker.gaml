@@ -70,37 +70,62 @@ global {
 	// ----------------- //
 	// WARR'S MODEL INIT //
 	
+	float WC_WEIGHT_CONSTANT <- 1.0;
+	point WC_WEIGHT_DEFAULT <- {0,1}; // uniform draw min (x) and max (y)
+	point WARR_MULTI_DEFAULT <- {1,1}; // truncated gaussian mean (x) and deviation (y)
+	point WARR_BASELOG_DEFAULT <- {#e,0}; // truncated gaussian mean (x) and deviation (y)
+	point WARR_NUTRIMENT_DEFAULT <- {1,5}; // uniform draw min (x) and max (y)
+	
 	/*
-	 * TODO: see in WARR's model to init work characteristic evaluation
+	 * list of warr's parameter model: <\br>
+	 * idx[0] = work characteristic weight <\br>
+	 * idx[1] = multiplicator of the log curve <\br>
+	 * idx[2] = base of the log <\br>
+	 * idx[3] = marginal decrement (if equal 0, vitamine, if superior to 0, nutriment)
+	 * TODO: see in WARR's model to init work characteristic evaluation 
 	 */
-	list<float> work_eval(characteristic work_char, bool rnd_weights <- default_rnd_wc_weights) {
+	list<float> work_eval(characteristic work_char, float weight <- WC_WEIGHT_CONSTANT) {
 		switch work_char {
-			match SALARY {return [rnd_weights?rnd(0.0,1.0):1.0,truncated_gauss(1.0,1.0),gauss(#e,0.5),0.0];} // Pure vitamine
-			match WORKING_TIME {return [rnd_weights?rnd(0.0,1.0):1.0,truncated_gauss(1.0,1.0),gauss(#e,0.5),rnd(1.0,5.0)];} // Nutriment
-			match CONTRACT {return [rnd_weights?rnd(0.0,1.0):1.0,truncated_gauss(1.0,1.0),gauss(#e,0.5),0.0];}  // Pure vitamine
-			default {return [rnd_weights?rnd(0.0,1.0):1.0,truncated_gauss(1.0,1.0),gauss(#e,0.5),flip(0.5)?0:rnd(1.0,5.0)];}
+			match SALARY {return warr_mode(weight,0.0);} // Pure vitamine
+			match WORKING_TIME {return warr_mode(weight,rnd(WARR_NUTRIMENT_DEFAULT.x,WARR_NUTRIMENT_DEFAULT.y));} // Nutriment
+			match CONTRACT {return warr_mode(weight,0.0);}  // Pure vitamine
+			match eijqi_autonomy {return warr_mode(weight,nutriment::rnd(WARR_NUTRIMENT_DEFAULT.x,WARR_NUTRIMENT_DEFAULT.y));} // Nutriment
+			match eijqi_interaction {return warr_mode(weight,0.0);} // Pure vitamine
+			match eijqi_intensity {return warr_mode(weight,nutriment::rnd(WARR_NUTRIMENT_DEFAULT.x,WARR_NUTRIMENT_DEFAULT.y));} // Nutriment
+			match eijqi_meaningful {return warr_mode(weight,0.0);} // Pure vitamine
+			default {return warr_mode(weight,flip(0.5)?0:rnd(WARR_NUTRIMENT_DEFAULT.x,WARR_NUTRIMENT_DEFAULT.y));} // Coin flip on vitamine or nutriment
 		}
 	}
 	
+	// Default nutriment behavior
+	list<float> warr_mode(float weight,  float nutriment, float multiplicator <- -1, int base_log <- -1) {
+		return [
+			weight<=0?rnd(WC_WEIGHT_DEFAULT.x,WC_WEIGHT_DEFAULT.y):weight,
+			multiplicator<=0?truncated_gauss(WARR_MULTI_DEFAULT.x,WARR_MULTI_DEFAULT.y):multiplicator,
+			base_log<=0?truncated_gauss(WARR_BASELOG_DEFAULT.x,WARR_BASELOG_DEFAULT.y):base_log,
+			nutriment
+		];
+	}
+		
 	// ---------------- //
 	// PERSONALITY INIT //
 	
 	// Personality trait profile with BFI
-	pair<int,int> minmax_o <- 10::50;
-	pair<int,int> minmax_c <- 9::45;
-	pair<int,int> minmax_e <- 8::40;
-	pair<int,int> minmax_a <- 9::45;
-	pair<int,int> minmax_n <- 8::40;
+	point minmax_o <- {10,50};
+	point minmax_c <- {9,45};
+	point minmax_e <- {8,40};
+	point minmax_a <- {9,45};
+	point minmax_n <- {8,40};
 	
 	/*
 	 * TODO: find data to init personnality
 	 */
 	worker random_gaussian_personality(worker w) {
-		w._o <- int(truncated_gauss(point(minmax_o.key+(minmax_o.value-minmax_o.key)/2.0,(minmax_o.value-minmax_o.key)/2.0)));
-		w._c <- int(truncated_gauss(point(minmax_c.key+(minmax_c.value-minmax_c.key)/2.0,(minmax_c.value-minmax_c.key)/2.0)));
-		w._e <- int(truncated_gauss(point(minmax_e.key+(minmax_e.value-minmax_e.key)/2.0,(minmax_e.value-minmax_e.key)/2.0)));
-		w._a <- int(truncated_gauss(point(minmax_a.key+(minmax_a.value-minmax_a.key)/2.0,(minmax_a.value-minmax_a.key)/2.0)));
-		w._n <- int(truncated_gauss(point(minmax_n.key+(minmax_n.value-minmax_n.key)/2.0,(minmax_n.value-minmax_n.key)/2.0)));
+		w._o <- int(truncated_gauss(point(minmax_o.x+(minmax_o.y-minmax_o.x)/2.0,(minmax_o.y-minmax_o.x)/2.0)));
+		w._c <- int(truncated_gauss(point(minmax_c.x+(minmax_c.y-minmax_c.x)/2.0,(minmax_c.y-minmax_c.x)/2.0)));
+		w._e <- int(truncated_gauss(point(minmax_e.x+(minmax_e.y-minmax_e.x)/2.0,(minmax_e.y-minmax_e.x)/2.0)));
+		w._a <- int(truncated_gauss(point(minmax_a.x+(minmax_a.y-minmax_a.x)/2.0,(minmax_a.y-minmax_a.x)/2.0)));
+		w._n <- int(truncated_gauss(point(minmax_n.x+(minmax_n.y-minmax_n.x)/2.0,(minmax_n.y-minmax_n.x)/2.0)));
 		return w;	
 	}
 	
@@ -196,20 +221,12 @@ species worker parent:individual {
 	reflex update_work_characteristic_perception {
 		float t;
 		if DEBUG_WORKER and DEBUG_TARGET contains self {t <- machine_time;}
-		loop c over:WORK_CHARACTERISTICS {
+		loop c over:WORK_CHARACTERISTICS where not(_work_aspects contains_key each) {
 			switch c {
-				match SALARY {_work_aspects[SALARY] <- string(my_work=nil?0:my_work.salary);}
-				match WORKING_TIME {
-					if not(_work_aspects contains_key WORKING_TIME) { 
-						_work_aspects[WORKING_TIME] <- string(with_precision(my_work.working_time_per_week/#h,2));
-					}
-				}
-				match CONTRACT {
-					if not(_work_aspects contains_key CONTRACT) {  _work_aspects[CONTRACT] <- string(my_work.contract); }
-				}
-				default {
-					if not(_work_aspects contains_key c) { _work_aspects[c] <- perceive_work_characteristics(c,my_work);}
-				}
+				match SALARY { _work_aspects[SALARY] <- string(my_work=nil?0:my_work.salary);}
+				match WORKING_TIME { _work_aspects[WORKING_TIME] <- string(with_precision(my_work.working_time_per_week/#h,2)); }
+				match CONTRACT { _work_aspects[CONTRACT] <- string(my_work.contract); }
+				default { _work_aspects[c] <- intrinsic_work_characteristics(c,my_work); }
 			}
 		}
 		if DEBUG_WORKER and t != 0 {ask world { do syso(sample(myself._work_aspects),machine_time-t,myself,"update_work_characteristic_perception",debug_level(0)); }}
@@ -245,24 +262,13 @@ species worker parent:individual {
 	// PERCEPTION //
 	// ---------- //
 	
-	float task_identity_exigence <- 1.0;
-	
-	string perceive_work_characteristics(characteristic job_characteristic, work the_work) {
+	string intrinsic_work_characteristics(characteristic job_characteristic, work the_work) {
 		string perception;
 		switch job_characteristic {
-			match task_identity { return task_identity.perceived_as((1 - 1 / (length(the_work.tasks)^task_identity_exigence)) * 2 - 1); }
-			// match task_significance { }
-			// match skill_variety { }
-			// match autonomy { }
-			// match feedback { }
-			// match job_security { }
-			// match advancement_op  { }
-			// match interesting_job { }
-	 		// match work_independently { }
-			// match help_people { }
-			// match useful_to_society { }
-			// match rl_with_manager { }
-			// match rl_with_colleague { }
+			// match EIJQI_AUTONOMY { }
+			// match EIJQI_INTENSITY { }
+			// match EIJQI_INTERACTION { }
+			// match EIJQI_MEANINGFUL { }
 			default { 
 				perception <- job_characteristic.perceived_as(rnd(PERCEPTION_VALENCE.key,PERCEPTION_VALENCE.value));
 			}
@@ -292,7 +298,7 @@ species worker parent:individual {
 		// Assess one job's characteristics impact based on warr's model
 		map<characteristic, pair<float,float>> val_weights <- [];
 		loop wc over:WORK_CHARACTERISTICS {
-			val_weights[wc] <- get_warr_factor(wc,_work_aspects[wc], work_evaluator[wc][1], work_evaluator[wc][2], work_evaluator[wc][3])::work_evaluator[wc][0];
+			val_weights[wc] <- get_warr_factor(wc, _work_aspects[wc], work_evaluator[wc][1], work_evaluator[wc][2], work_evaluator[wc][3])::work_evaluator[wc][0];
 		}
 		
 		if DEBUG_WORKER and t != 0 { 
@@ -326,7 +332,7 @@ species worker parent:individual {
 	/*
 	 * How much bad experience is weighted upon work characteristic evaluation
 	 */
-	float extravert_social_ref(float extra <- ext_mode) { return _e / minmax_e.value * extra; }
+	float extravert_social_ref(float extra <- ext_mode) { return _e / minmax_e.y * extra; }
 	
 	/*
 	 * Update the list of social references
@@ -353,7 +359,6 @@ species worker parent:individual {
 		
 		float thresh <- extravert_social_ref();
 		sr <- sr where (abs(_job_satisfaction - each._job_satisfaction) / (_job_satisfaction+EPSILON) <= thresh or flip(1-ext_mode));
-		
 		
 		if DEBUG_WORKER and t != 0 { ask world { do syso(sample(sr),machine_time-t,myself,"update_social_references",debug_level(0)); } }
 		return sr;
@@ -382,9 +387,9 @@ species worker parent:individual {
 		
 	// key is work carac and value is :
 	// index 0 = weights of work caracteristic
-	// index 1 = 'a' parameter of warr's vitamine model
-	// index 2 = 'b' parameter of warr's vitamine model
-	// index 3 = 'd' parameter of warr's vitamine model
+	// index 1 = 'a' parameter of warr's vitamine/nutriment model
+	// index 2 = 'b' parameter of warr's vitamine/nutriment model
+	// index 3 = 'd' parameter of warr's vitamine/nutriment model
 	map<characteristic, list<float>> work_evaluator;
 	
 	// slope of the log
@@ -482,7 +487,7 @@ species worker parent:individual {
 		
 		if 0 > andness or andness > 1 {
 			error sample(andness)+" should be "+(0>andness?"higher than 0":"lower than 1")
-				+" -- See var "+sample(_n)+sample(minmax_n.value)+sample(rho_neuroticism_weight);
+				+" -- See var "+sample(_n)+sample(minmax_n.y)+sample(rho_neuroticism_weight);
 		}
 		
 		// Weights given by value ordering, with andness parameter
@@ -541,7 +546,7 @@ species worker parent:individual {
 	/*
 	 * How much bad experience is weighted upon work characteristic evaluation
 	 */
-	float rho_agg(float neuroticism_weight <- rho_neuroticism_weight) { return _n / minmax_n.value * neuroticism_weight; }
+	float rho_agg(float neuroticism_weight <- rho_neuroticism_weight) { return _n / minmax_n.y * neuroticism_weight; }
 	
 	// ------- //
 	// EMOTION //
@@ -574,7 +579,7 @@ species worker parent:individual {
 	 * How much emotional response is important in job satisfaction
 	 */
 	float emotional_balance_weigth(int openness_weight <- 3, float randomness <- rnd(1.0)) {
-		return openness_weight=0?0.5:(_o / minmax_o.value * openness_weight + randomness) / (openness_weight+1); 
+		return openness_weight=0?0.5:(_o / minmax_o.y * openness_weight + randomness) / (openness_weight+1); 
 	}
 	
 }

@@ -39,6 +39,7 @@ global {
 	}
 	
 	// stop the simulation if satisfaction does not move more than 'epsilon' in a 'windows' time frame for every agent
+	// TODO : have a end cycle in case there is no equilibria state reached
 	bool stop_sim(float epsilon <- EPSILON) { 
 		bool stop <- sats none_matches (length(each) < windows or abs(min(each) - max(each)) > epsilon);
 		if stop {

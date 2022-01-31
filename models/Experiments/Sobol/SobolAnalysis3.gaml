@@ -13,6 +13,7 @@ import "../../Global.gaml"
 global {
 	string output_file <- "../../../batch_output/Sobol_orga_perso.csv";
 	string sobol_report <- "../../../batch_output/Sobol_zero.txt";
+	string ewcs_transformed <- "../../../includes/ewcs2015_short_fr.csv";
 	bool default_rnd_wc_weights <- true; // Activate random weigths of work characteristics
 }
 

@@ -105,7 +105,7 @@ species num_characteristic parent:characteristic {
 	
 	int compare_values(string val1, string val2) { 
 		float diff <- get_numerical_value(val1) - get_numerical_value(val2);
-		if abs(diff) < equality_range {return 0;}
+		if abs(diff) <= get_numerical_value(val1) * equality_range {return 0;}
 		return int(diff);
 	}
 	
