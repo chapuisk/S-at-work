@@ -13,60 +13,6 @@ import "Global.gaml"
 
 global {
 	
-	/*
-	 * workforce synthesis based on joint distribution of demographics
-	 */
-	list<worker> workforce_synthesis(int nb, map<map<characteristic,string>,float> joint_distribution) {
-		if empty(WORK_CHARACTERISTICS) {error "Work characteristic should be initialze first";}
-		if empty(joint_distribution) {error "Cannot initialize workforce with empty distribution";}
-		create worker number:nb returns:work_force {
-			map<characteristic,string> profile <- rnd_choice(joint_distribution);
-			loop c over:profile.keys {
-				string v <- profile[c];
-				switch c.gama_type {
-					match_one ["int","float"] {
-						if float(c.get_space()[0]) > float(v) or float(c.get_space()[1]) < float(c) {
-							ask world {do syso("Wrong numerical value "+v+" for "+c,action_name::"workforce_synthesis",level::last(debug_levels));}
-						} 
-					}
-					default { 
-						if not(c.get_space() contains v) { ask world {do syso("Unmatching value "+v+" for characteristic "+c.name+" [val="+c.get_space()+"]",
-							action_name::"workforce_synthesis",level::last(debug_levels)
-						);} }
-					}
-				}
-				_demographics[c] <- v;
-			}
-			// Build personality
-			ask world {do random_gaussian_personality(myself);}
-			// Build work evaluation
-			loop c over:WORK_CHARACTERISTICS { work_evaluator[c] <- world.work_eval(c); }
-		}
-		return work_force;
-	}
-	
-	/*
-	 * Default unrelated random init
-	 */
-	list<worker> random_workforce_synthesis(int nb, float male_prop, map<point,float> age_distribution, 
-		map<string,float> education_distribution, map<string,float> family_distribution
-	) {
-		if empty(WORK_CHARACTERISTICS) {error "Work characteristic should be initialze first";}
-		create worker number:nb returns:work_force {
-			_demographics[GENDER] <- flip(male_prop)?string(GENDER.get_space()[0]):string(GENDER.get_space()[1]);
-			point age_range <- age_distribution=nil or empty(age_distribution)?rnd(16,65):rnd_choice(age_distribution);
-			_demographics[AGE] <- string(int(rnd(age_range.x,age_range.y)));
-			_demographics[EDUCATION] <- rnd_choice(education_distribution);
-			_demographics[FAMILY] <- rnd_choice(family_distribution);
-			// Build personality
-			ask world {do random_gaussian_personality(myself);}
-			// Build work evaluation
-			loop c over:WORK_CHARACTERISTICS { work_evaluator[c] <- world.work_eval(c); } 
-			
-		} 
-		return work_force;
-	}
-	
 	// ----------------- //
 	// WARR'S MODEL INIT //
 	
@@ -224,7 +170,7 @@ species worker parent:individual {
 		loop c over:WORK_CHARACTERISTICS where not(_work_aspects contains_key each) {
 			switch c {
 				match SALARY { _work_aspects[SALARY] <- string(my_work=nil?0:my_work.salary);}
-				match WORKING_TIME { _work_aspects[WORKING_TIME] <- string(with_precision(my_work.working_time_per_week/#h,2)); }
+				match WORKING_TIME { _work_aspects[WORKING_TIME] <- string(with_precision(my_work.working_time_per_week,2)); }
 				match CONTRACT { _work_aspects[CONTRACT] <- string(my_work.contract); }
 				default { _work_aspects[c] <- intrinsic_work_characteristics(c,my_work); }
 			}

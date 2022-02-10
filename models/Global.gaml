@@ -14,6 +14,11 @@ import "Observer.gaml"
 
 global {
 	
+	// Experiment
+	string model_source_folder <- "";
+	// Synth pop
+	string synth_pop <- model_source_folder+"../includes/synthpop.csv";
+	
 	// #####################
 	// MODEL VAR
 	
@@ -144,8 +149,20 @@ global {
 	
 	// INIT OF WORKERS
 	action init_workers {
-		do read_default_data();
-		do workforce_synthesis(nb_agent, demo_distribution); 
+		loop wl over:sample(rows_list(csv_file(synth_pop).contents),nb_agent,false) {
+			create worker {
+				_demographics[AGE] <- wl[0];
+				_demographics[GENDER] <- wl[1];
+				_demographics[EDUCATION] <- wl[2];
+				_demographics[FAMILY] <- wl[3];
+				ask world {do random_gaussian_personality(myself);}
+				int idx <- 4;
+				loop c over:WORK_CHARACTERISTICS { 
+					work_evaluator[c] <- world.work_eval(c);
+					_work_aspects[c] <- wl[idx]; idx <- idx+1; 
+				}
+			}
+		}
 	}
 	
 	// INIT OF SOCIAL CONNECTIONS
@@ -175,20 +192,31 @@ global {
 	action init_organization {
 		list a <- list(worker); 
 		loop while:not(empty(a)) {
+			
 			// Draw a size for the organization and as many worker
 			pair<int,int> p <- rnd_choice(orga_sizes);
 			int n <- rnd(p.key,p.value);
 			list sub_a <- n>length(a) ? a : n among a;
 			
-			// Create works according to agent demographics
-			map<worker,work> sub_w <- sub_a as_map (each::create_eijqi_work(each));
-			loop w over:sub_w.keys {w.my_work <- sub_w[w];} 
+			list<work> sub_w;
+			loop wer over:sub_a {
+				// Create works according to agent 
+				create work with:[
+					salary::SALARY.get_numerical_value(wer._work_aspects[SALARY]),
+					working_time_per_week::WORKING_TIME.get_numerical_value(wer._work_aspects[WORKING_TIME]),
+					contract::wer._work_aspects[CONTRACT]
+				] returns:w;
+			
+				sub_w <+ first(w);
+				wer.my_work <- first(w);
+			
+			} 
 			
 			// Create a simple organization
-			organization o <- build_single_position_orga(sub_w.values);
+			organization o <- build_single_position_orga(sub_w);
 			o.workers <- copy(sub_a);
 			
-			// Remove workers that have been assigned a job and an organization
+			// Remove workers that have been assigned an organization
 			a >>- sub_a;
 		}
 	}
@@ -198,112 +226,16 @@ global {
 	// Can add something after global init overloading the method
 	action last_init {}
 	
-	// -------------------------------------------- //
-	// 				INPUT DATA MANAGEMENT			//
 	
-	// EUROSTATS
-	// ----
-	
-	string eurostat_folder <-  "../includes/EUROSTATS/";
-	string scripts_folder <- "../scripts/";
-	map<map<characteristic,string>,float> demo_distribution;
-	
-	// Demogrphics
-	string es_educ_path <- eurostat_folder+"Age_sex_educ_employees.csv";
-	
-	// Work characteristics
-	string es_earnings_path <- scripts_folder+"fitdist/fit_earning_eurostats.csv";
-	map<list<string>,pair<float,float>> lnorm_earning_map <- [];
-	
-	string es_time_path <- eurostat_folder+"Sex_partfulltime_employement.csv";
-	list<string> time_regimes <- ["Part-time","Full-time"];
-	map<list<string>,float> bimod_workingtime_map <- [];
-	
-	/*
-	 * Read, clean and prepare default data 
-	 * TODO : create a clean log of the method activities
-	 */
-	action read_default_data {
-		
-		demo_distribution <- [];
-		
-		// Read data for educ x gender x age
-		matrix medu <- matrix(csv_file(es_educ_path));
-		map<string,list<string>> gender_map <- ["Males"::["M"],"Females"::["W"]];
-		map<string,list<string>> edu_map <- [
-			"Less than primary; primary and lower secondary education (levels 0-2)"::["No education completed","Primary or lower secondary education"],
-			"Upper secondary and post-secondary non-tertiary education (levels 3 and 4)"::["Upper secondary or post-secondary education"],
-			"Tertiary education (levels 5-8)"::["Tertiary education"]];
-		map<string,list<int>> age_map <- ["From 15 to 24 years"::range(15,24),"From 25 to 49 years"::range(25,49),"From 50 to 74 years"::range(50,74)];
-		map<map<characteristic,string>,float> dist_medu <- []; 
-		loop rm over:rows_list(medu) {
-			if(gender_map contains_key first(rm)){
-				loop ak over:age_map.keys {
-					loop rgk over:gender_map[string(rm[0])] {
-						loop rek over:edu_map[string(rm[1])] {
-							loop rak over:age_map[ak] {
-								dist_medu[[GENDER::rgk,EDUCATION::rek,AGE::rak]] <- float(rm[2+age_map.keys index_of ak]);
-							}
-						}
-					}
-				}
-			}
-		}
-		
-		// TODO: Find data about age x gender x family status
-		// For now uniform
-		loop ck over:dist_medu.keys {
-			loop fv over:FAMILY.get_space() {
-				map<characteristic,string> actual_k <- copy(ck);
-				actual_k <+ FAMILY::fv;
-				demo_distribution[actual_k] <- dist_medu[ck];
-			}
-		}
-		
-		matrix mearn <- matrix(csv_file(es_earnings_path));
-		loop row over:rows_list(mearn){
-			list<string> key <- [first(row)="F"?"W":first(row)];
-			pair<float,float> params <- float(row[3])::float(row[4]);
-			int age_low_bound; int age_upper_bound;
-			switch row[1] { 
-				match "<30" { age_low_bound <- 15; age_upper_bound <- 29; }
-				match "30-39" { age_low_bound <- 30; age_upper_bound <- 39; }
-				match "40-49" { age_low_bound <- 40; age_upper_bound <- 49; }
-				match "50-59" { age_low_bound <- 50; age_upper_bound <- 59; }
-				match ">60" { age_low_bound <- 60; age_upper_bound <- 74; }
-			}
-			loop a from:age_low_bound to:age_upper_bound { lnorm_earning_map[key+[string(a)]] <- params; }
-		}
-		
-		do syso(sample(lnorm_earning_map),level::first(debug_levels));
-		
-		matrix mtime <- matrix(csv_file(es_time_path));
-		int midx; int widx;
-		loop row over:rows_list(mtime){
-			if row contains "Males" and row contains "Females"{ midx <- row index_of "Males"; widx <- row index_of "Females"; }
-			if time_regimes contains first(row) {
-				list<string> key <- [first(row)];
-				bimod_workingtime_map[key+["M"]] <- float(row[midx]);
-				bimod_workingtime_map[key+["W"]] <- float(row[widx]);
-			}
-		}
-		
-		do syso(sample(bimod_workingtime_map),level::first(debug_levels));
-		
-		// Orga stuff
-		// INSEE Data on the distribution of french firms according to the number of employees
-		orga_sizes <- [(1::9)::1028.1,(10::49)::172.6,(50::99)::18.1,
-			(100::249)::10.8,(250::nb_agent>250?nb_agent:250)::6.3
-		];
-	}
 	
 	// ------------------------------------------- //
 	// ------------------- SIM ------------------- //
 
 	// BATCH MODE
 	bool batch_mode <- false;
-	string output_file <- "batch_output/results.csv";
-
+	string output_file <- model_source_folder+"batch_output/results.csv";
+	string sobol_report <- model_source_folder+"batch_output/Sobol_zero.txt";
+	
 	/*
 	 * Trigger output computation and stop simulation if not batch mode
 	 */

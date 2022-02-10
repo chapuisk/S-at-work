@@ -19,7 +19,10 @@ global {
 	int DEFAULT_HORIZONTAL_DISTANCE_UNIT <- 1;
 	
 	// SOME BASIC INIT STUFF
-	map<pair<int,int>,float> orga_sizes; 
+	// INSEE Data on the distribution of french firms according to the number of employees
+	map<pair<int,int>,float> orga_sizes <- [(1::9)::1028.1,(10::49)::172.6,(50::99)::18.1,
+			(100::249)::10.8,(250::nb_agent>250?nb_agent:250)::6.3
+	];
 	
 	/*
 	 * Build an organization from its hierarchy

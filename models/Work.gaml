@@ -34,10 +34,6 @@ global {
 	list<string> default_contract_types <- ["short term","long term"];
 	map<string,float> contract_types_weights <- [default_contract_types[0]::0.105,default_contract_types[1]::0.895]; // temporary employement Eurostats
 	
-	// EIJQI : Mira 2021
-	// https://doi.org/10.1007/s11205-021-02615-9
-	string ewcs_transformed <- "../../includes/ewcs2015_short_fr.csv";
-	matrix ewcs_data;
 	point ewcs_earning_span <- nil;
 	
 	float EIJQI_EQUI <- 0.1;
@@ -104,13 +100,6 @@ global {
 		if WORK_CHARACTERISTICS!=nil and not(empty(WORK_CHARACTERISTICS)) {
 			WORK_CHARACTERISTICS <<+ [eijqi_autonomy,eijqi_intensity,eijqi_interaction,eijqi_meaningful];
 		}
-		if ewcs_transformed!=nil and ewcs_transformed!="" { ewcs_data <- matrix(csv_file(ewcs_transformed)); }
-		ewcs_earning_span <- {#infinity,0};
-		loop r from:0 to: ewcs_data.rows - 1 {
-			int val <- int(float(ewcs_data[8,r]));
-			if val < ewcs_earning_span.x {ewcs_earning_span <- {val,ewcs_earning_span.y};}
-			if val > ewcs_earning_span.y {ewcs_earning_span <- {ewcs_earning_span.x,val};}
-		}
 	}
 	
 	// ====== FACTORY
@@ -133,73 +122,7 @@ global {
 		return first(w);
 	}
 	
-	// Create work based on estimated distribution <p>
-	// see Global.gaml read_default_data method
-	work create_random_work(worker w, list<task> ts <- nil, float working_time_sigma <- 1) {
-		if lnorm_earning_map=nil or empty(lnorm_earning_map) {
-			do syso("Earning distribution map should not be null or empty",action_name::"create_random_work",level::last(debug_levels));
-		}
-		if bimod_workingtime_map=nil or empty(bimod_workingtime_map) {
-			do syso("Working time distribution map should not be null or empty",action_name::"create_random_work",level::last(debug_levels));
-		}
-		
-		// Choose betwee part or full time (i.e. any statement), then use corresponding mean value in a gaussian
-		float wt <- gauss(bimod_workingtime_map[any(bimod_workingtime_map.keys where (each contains w._demographics[GENDER]))],working_time_sigma);
-		// Choose salary according to working hours
-		pair<float,float> param <- lnorm_earning_map[[w._demographics[GENDER],w._demographics[AGE]]];
-		int s <- round(lognormal_rnd(param.key,param.value) * wt);
-		// If no tasks are given create only one
-		if ts=nil {create task returns:t; ts <- t;}
-		
-		
-		create work with:[tasks::ts,salary::s,working_time_per_week::wt,contract::rnd_choice(contract_types_weights)] returns:res;
-		work the_work <- first(res);
-		w.my_work <- the_work;
-		return first(res);
-	}
 	
-	// Create works based on data from EWCS, following EIJQI that summs up intrisic work characteristics from EWCS <p>
-	// #1 Build a random work based on demographics <\br>
-	// #2 Use demographic and builded work characteristics to choose a EIJQI perception that fit 
-	work create_eijqi_work(worker w) {
-		work my_work <- create_random_work(w);
-		
-		list<float> dist;
-		loop rec over:rows_list(ewcs_data) {
-			float fit <- 0.0; 
-			// Family
-			int family_rec <- int(rec[1]);
-			switch w.get(FAMILY) { 
-				match "Single adult without children" { if family_rec=1 {fit <- fit + 1;} }
-				match "Single adult with children" { if family_rec>=2 {fit <- fit + 1;}}
-				match "Couple without children" { if family_rec=2 {fit <- fit + 1;}}
-				match "Couple with children" { if family_rec>2 {fit <- fit + 1;}}
-			}
-			// Gender
-			fit <- fit + 1 - GENDER.compare_values(w.get(GENDER),rec[2]);
-			// Age
-			fit <- fit + 1 / (1 + abs(AGE.compare_values(w.get(AGE),rec[3])) / 5); 
-			// Type of contract
-			fit <- fit + (rec[5] = my_work.contract ? 1 : 0);
-			// Working time
-			fit <- fit + 1 / (1 + abs(int(rec[6]) - my_work.working_time_per_week) / my_work.working_time_per_week * working_time_equivalence);
-			// Education
-			fit <- fit + 1 - EDUCATION.compare_values(w.get(EDUCATION),rec[7]);
-			// Salary
-			fit <- fit + 1 / (1 + abs(int(rec[8]) - my_work.salary) / my_work.salary * salary_equivalence);
-			
-			dist <+ fit;
-		}
-		int drawn_rec <- rnd_choice(dist);
-		
-		// TODO : ideally we should define jobs characteristics that fit perceptions rather than force perceptions
-		w._work_aspects[eijqi_autonomy] <- ewcs_data[10,drawn_rec];
-		w._work_aspects[eijqi_interaction] <- ewcs_data[11,drawn_rec];
-		w._work_aspects[eijqi_intensity] <- ewcs_data[12,drawn_rec];
-		w._work_aspects[eijqi_meaningful] <- ewcs_data[13,drawn_rec];
-		
-		return my_work;
-	}
 	
 	// -------------------------------------- //
 	// WORK CHARACTERISTIC CREATION
