@@ -11,6 +11,8 @@ model Stochasticityxp
 import "../Global.gaml"
 
 global {
+	
+	string model_source_folder <- "../";
 	string output_file <- "../../batch_output/stochastic_xp.csv";
 	bool DEBUG_MOD <- true;
 	
@@ -18,6 +20,4 @@ global {
 }
 
 experiment stochastic_xp parent:abstract_batch type:batch 
-	repeat:50 until:world.stop_sim(){
-	method explicit parameter_sets:list(range(0,39) collect (["dummy_var"::each]));	
-}
+	repeat:2000 until:world.stop_sim(){	}

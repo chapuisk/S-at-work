@@ -14,6 +14,7 @@ import "../Worker.gaml"
 
 global {
 	
+	string model_source_folder <- "../";
 	bool DEBUG_MOD <- true;
 	string LEVEL <- "DEBUG";
 

@@ -11,9 +11,10 @@ model SobolAnalysis2
 import "../../Global.gaml"
 
 global {
+	
+	string model_source_folder <- "../../";
 	string output_file <- "../../../batch_output/Sobol_orga.csv";
 	string sobol_report <- "../../../batch_output/Sobol_zero.txt";
-	string ewcs_transformed <- "../../../includes/ewcs2015_short_fr.csv";
 	float WC_WEIGHT_CONSTANT <- -1.0; // Activate random weigths of work characteristics
 }
 
