@@ -233,8 +233,11 @@ global {
 
 	// BATCH MODE
 	bool batch_mode <- false;
-	string output_file <- model_source_folder+"batch_output/results.csv";
-	string sobol_report <- model_source_folder+"batch_output/Sobol_zero.txt";
+	
+	string output_file <- model_source_folder+"../batch_output/"+res_file;
+	string res_file <- "results.csv";
+	string sobol_report <- model_source_folder+"../batch_output/"+sobol_file;
+	string sobol_file <- "Sobol.txt";
 	
 	/*
 	 * Trigger output computation and stop simulation if not batch mode
@@ -343,32 +346,33 @@ experiment abstract_batch virtual:true type:batch until:world.stop_sim() {
 	
 	/*
 	 * Main output of the simulation without parameters
+	 * TODO : bugged relfex when replication is disabled
 	 */
 	reflex end_batch {
 		
-		if int(first(simulations))=0 {
-			save ["Sim id","end cycle","avr sat","s index","g index","a index",
-				"sq1","sq2","sq3","sq4","sq5","sq6","sq7","sq8","sq9","sq10",
-				"wmin","wavr","wmax","mmin","mavr","mmax",
-				"a25","a35","a45","a55","a65","a"+MAX_AGE] 
-			type:csv to:output_file rewrite:true header:false;
-		}
-		
-		ask simulations {
-			save [int(self),self.end_cycle_batch,self.avr_sat_batch,
-				self.s_index_batch,self.g_index_batch,self.a_index_batch]
-				 +self.main_observer.qSat
-				+[self.main_observer.gSat["W"][MOMENTS index_of MIN],
-					self.main_observer.gSat["W"][MOMENTS index_of AVR],
-					self.main_observer.gSat["W"][MOMENTS index_of MAX]
-				]
-				+[self.main_observer.gSat["M"][MOMENTS index_of MIN],
-					self.main_observer.gSat["M"][MOMENTS index_of AVR],
-					self.main_observer.gSat["M"][MOMENTS index_of MAX]
-				]
-				+self.main_observer.aSat 
-			type:csv to:output_file rewrite:false;
-		}
+//		if int(first(simulations))=0 {
+//			save ["Sim id","end cycle","avr sat","s index","g index","a index",
+//				"sq1","sq2","sq3","sq4","sq5","sq6","sq7","sq8","sq9","sq10",
+//				"wmin","wavr","wmax","mmin","mavr","mmax",
+//				"a25","a35","a45","a55","a65","a"+MAX_AGE] 
+//			type:csv to:output_file rewrite:true header:false;
+//		}
+//		
+//		ask simulations {
+//			save [int(self),self.end_cycle_batch,self.avr_sat_batch,
+//				self.s_index_batch,self.g_index_batch,self.a_index_batch]
+//				 +self.main_observer.qSat
+//				+[self.main_observer.gSat["W"][MOMENTS index_of MIN],
+//					self.main_observer.gSat["W"][MOMENTS index_of AVR],
+//					self.main_observer.gSat["W"][MOMENTS index_of MAX]
+//				]
+//				+[self.main_observer.gSat["M"][MOMENTS index_of MIN],
+//					self.main_observer.gSat["M"][MOMENTS index_of AVR],
+//					self.main_observer.gSat["M"][MOMENTS index_of MAX]
+//				]
+//				+self.main_observer.aSat 
+//			type:csv to:output_file rewrite:false;
+//		}
 		
 	}
 	

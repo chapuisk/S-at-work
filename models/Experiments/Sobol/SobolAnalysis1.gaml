@@ -14,6 +14,9 @@ global {
 	string model_source_folder <- "../../";	
 	bool default_rnd_wc_weights <- true; // Activate random weigths of work characteristics
 	
+	string res_file <- "results_sob1.csv";
+	string sobol_file <- "sobol1.txt";
+	
 	action init_organization {
 		loop wer over:worker {
 			// Create works according to agent 
@@ -34,7 +37,7 @@ experiment sobol_xplo_1 parent:abstract_batch type:batch until:world.stop_sim(){
 	parameter "gamma" var:default_gamma min:0.0 max:1.0;
 	parameter "number of agent" var:nb_agent min:1000 max:5000;
 	parameter "agent memory length" var:default_agent_memory min:1 max:10;
-	method sobol sample:4 outputs:["s_index_batch","a_index_batch","g_index_batch"] report:sobol_report results:output_file;
+	method sobol sample:20 outputs:["s_index_batch","a_index_batch","g_index_batch"] report:sobol_report results:output_file;
 }
 
 
