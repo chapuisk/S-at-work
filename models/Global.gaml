@@ -44,7 +44,7 @@ global {
 	int nb_agent init:1000 parameter:true category:"Agent init";
 	
 	// Observer
-	int windows init:5 parameter:true category:"Observer"; // PARAMETER
+	int windows init:4 parameter:true category:"Observer"; // PARAMETER
 	int q_number init:10 min:4 max:10 parameter:true category:"Observer"; // PARAMETER
 	
 	// *************** //
@@ -54,7 +54,7 @@ global {
 	
 	// 5-traits
 	float extra_selection <- 0.0 parameter:true min:0.0 max:1.0 category:"Personality"; // Tendency to reject middle judgement (average satisfaction)
-	float consceint_somthing; // TODO find correlations between _c and job evaluation
+	float default_new_mode <- 0.2 parameter:true min:0.0 max:1.0 category:"Personality"; // Tendency to accept new ideas (openess) or to be empatic (agreableness)
 	
 	// W-OWA
 	bool default_rnd_wc_weights <- false parameter:true category:"W-OWA";
@@ -70,13 +70,15 @@ global {
 	bool default_update_social_referents <- false;
 	int default_nb_contacts <- 0;
 	
-	int default_nb_wchar_ex <- 1;
+	int default_nb_wchar_ex <- 0;
+	
+	bool kinship <- false;
 	
 	// *************** //
 	
 	// Network
 	graph sn;
-	string net_type <- "Random" among:["Random","ScaleFree","SmallWorld"];
+	string net_type <- "Complet" among:["Random","ScaleFree","SmallWorld","Complet"];
 	int net_type_sobol <- -1;
 	
 	int erdos_renyi_k <- 4 min:1 max:20;
@@ -179,7 +181,7 @@ global {
 			match "SmallWorld" {
 				sn <- generate_watts_strogatz(length(worker),watts_strogatz_p,watts_strogatz_k,false,noeud,lien);
 			}
-			match "Default" {}
+			default { sn <- generate_complete_graph(length(worker),false); }
 		} 
 		do syso("Network generated",benchmark_time::machine_time-t);
 		map<noeud,worker> nw <- []; map<worker,noeud> wn; list n <- list(noeud);
@@ -350,29 +352,29 @@ experiment abstract_batch virtual:true type:batch until:world.stop_sim() {
 	 */
 	reflex end_batch {
 		
-//		if int(first(simulations))=0 {
-//			save ["Sim id","end cycle","avr sat","s index","g index","a index",
-//				"sq1","sq2","sq3","sq4","sq5","sq6","sq7","sq8","sq9","sq10",
-//				"wmin","wavr","wmax","mmin","mavr","mmax",
-//				"a25","a35","a45","a55","a65","a"+MAX_AGE] 
-//			type:csv to:output_file rewrite:true header:false;
-//		}
-//		
-//		ask simulations {
-//			save [int(self),self.end_cycle_batch,self.avr_sat_batch,
-//				self.s_index_batch,self.g_index_batch,self.a_index_batch]
-//				 +self.main_observer.qSat
-//				+[self.main_observer.gSat["W"][MOMENTS index_of MIN],
-//					self.main_observer.gSat["W"][MOMENTS index_of AVR],
-//					self.main_observer.gSat["W"][MOMENTS index_of MAX]
-//				]
-//				+[self.main_observer.gSat["M"][MOMENTS index_of MIN],
-//					self.main_observer.gSat["M"][MOMENTS index_of AVR],
-//					self.main_observer.gSat["M"][MOMENTS index_of MAX]
-//				]
-//				+self.main_observer.aSat 
-//			type:csv to:output_file rewrite:false;
-//		}
+		if int(first(simulations))=0 {
+			save ["Sim id","end cycle","avr sat","s index","g index","a index",
+				"sq1","sq2","sq3","sq4","sq5","sq6","sq7","sq8","sq9","sq10",
+				"wmin","wavr","wmax","mmin","mavr","mmax",
+				"a25","a35","a45","a55","a65","a"+MAX_AGE] 
+			type:csv to:output_file rewrite:true header:false;
+		}
+		
+		ask simulations {
+			save [int(self),self.end_cycle_batch,self.avr_sat_batch,
+				self.s_index_batch,self.g_index_batch,self.a_index_batch]
+				 +self.main_observer.qSat
+				+[self.main_observer.gSat["W"][MOMENTS index_of MIN],
+					self.main_observer.gSat["W"][MOMENTS index_of AVR],
+					self.main_observer.gSat["W"][MOMENTS index_of MAX]
+				]
+				+[self.main_observer.gSat["M"][MOMENTS index_of MIN],
+					self.main_observer.gSat["M"][MOMENTS index_of AVR],
+					self.main_observer.gSat["M"][MOMENTS index_of MAX]
+				]
+				+self.main_observer.aSat 
+			type:csv to:output_file rewrite:false;
+		}
 		
 	}
 	

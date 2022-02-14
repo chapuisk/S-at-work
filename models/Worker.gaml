@@ -22,6 +22,17 @@ global {
 	point WARR_BASELOG_DEFAULT <- {#e,0}; // truncated gaussian mean (x) and deviation (y)
 	point WARR_NUTRIMENT_DEFAULT <- {1,5}; // uniform draw min (x) and max (y)
 	
+	// --------------------------- //
+	// Work characteristic weights //
+	
+	float salary_weight <- WC_WEIGHT_CONSTANT;
+	float working_time_weight <- WC_WEIGHT_CONSTANT;
+	float contract_weight <- WC_WEIGHT_CONSTANT;
+	float autonomy_weight <- WC_WEIGHT_CONSTANT;
+	float interaction_weight <- WC_WEIGHT_CONSTANT;
+	float intensity_weight <- WC_WEIGHT_CONSTANT;
+	float meaningful_weight <- WC_WEIGHT_CONSTANT;
+	
 	/*
 	 * list of warr's parameter model: <\br>
 	 * idx[0] = work characteristic weight <\br>
@@ -104,7 +115,31 @@ species individual virtual:true {
 	int _a; // agreeableness = friendly/compassionate vs. critical/rational - 9 items 
 	int _n; // neuroticism = sensitive/nervous vs. resilient/confident - 8 items
 	
-	// -------------
+	// MODERATOR
+	
+	// -----------
+	// Neuroticism
+	
+	// weight of neuroticism on cognitive aspect of negative evaluation
+	float _rho_neuroticism_weight <- default_neu_rho;
+	float rho_agg(float neuroticism_weight <- _rho_neuroticism_weight) { return _n / minmax_n.y * neuroticism_weight; } // How much bad experience is weighted upon work characteristic evaluation
+	
+	// ------------
+	// Extraversion
+	
+	// TODO : put _e as an antecedent of the number of social references
+	// Trying to compare with people with poor or high satisfaction
+	float _ext_mode <- extra_selection;
+	float extravert_social_ref(float extra <- _ext_mode) { return 1 - _ext_mode + (_e / minmax_e.y * extra); } // Threshold of difference to connect with people
+	
+	// ------------
+	// Openess and agreeableness
+	
+	float _new_mode <- default_new_mode;
+	float open_to_new_ideas(float open_agreeableness <- _new_mode) { return (_o / minmax_o.y + _a / minmax_a.y) / 2 * open_agreeableness; }
+	
+	// --------------------------- //
+	// DEMOGRAPHIC CHARACTERISTICS //
 	
 	/*
 	 * Get the corresponding demographic value
@@ -198,9 +233,9 @@ species worker parent:individual {
 	 * Finally assess one's attitude toward job
 	 */
 	reflex update_attitude_toward_job {
-		if length(__sat_memory) = __memory_length { __sat_memory >- last(__sat_memory); }
 		if disable_emotion { emotional_balance <- 0.0; } else { emotional_balance <- emotional_balance_weigth();}
-		_job_satisfaction <- (__sat_memory max_of (abs(each)) + _cognitive_resp) / 2 * (1 - emotional_balance) + emotional_resp  * emotional_balance;
+		_job_satisfaction <- (__sat_memory max_of (abs(each)) + _cognitive_resp) / 2 * (1 - emotional_balance) + emotional_resp * emotional_balance;
+		if length(__sat_memory) = __memory_length { __sat_memory >- first(__sat_memory); }
 		__sat_memory <+ _job_satisfaction;
 	}
 
@@ -271,15 +306,6 @@ species worker parent:individual {
 	list<worker> __social_references;
 	float org_kindship_factor <- 1.0; // How close from my point i evaluate people from my own organization - 1 is neutral value (linear over network distance)
 	
-	// TODO : put _e as an antecedent of the number of social references
-	// Trying to compare with people with poor or high satisfaction
-	float ext_mode <- extra_selection;
-	
-	/*
-	 * How much bad experience is weighted upon work characteristic evaluation
-	 */
-	float extravert_social_ref(float extra <- ext_mode) { return _e / minmax_e.y * extra; }
-	
 	/*
 	 * Update the list of social references
 	 */
@@ -303,8 +329,7 @@ species worker parent:individual {
 		}
 		// -------
 		
-		float thresh <- extravert_social_ref();
-		sr <- sr where (abs(_job_satisfaction - each._job_satisfaction) / (_job_satisfaction+EPSILON) <= thresh or flip(1-ext_mode));
+		sr <- sr where (abs(_job_satisfaction - each._job_satisfaction) / (_job_satisfaction+EPSILON) <= extravert_social_ref());
 		
 		if DEBUG_WORKER and t != 0 { ask world { do syso(sample(sr),machine_time-t,myself,"update_social_references",debug_level(0)); } }
 		return sr;
@@ -316,15 +341,15 @@ species worker parent:individual {
 	 * Default implementation provide organization based relationship,i.e. how close jobs of the two individuals are
 	 */
 	float get_organizational_kinship(individual i) {
-		float kinship;
+		float k;
 		if relatives contains i or friends contains i {
-			kinship <- 1.0;
+			k <- 1.0;
 		} else if type_of(i) is worker and my_work.org = worker(i).my_work.org {
-			kinship <- 1 / ((my_work.org.get_distance(my_work,worker(i).my_work) + DEFAULT_HORIZONTAL_DISTANCE_UNIT=0?1:0 )^org_kindship_factor);
+			k <- 1 / ((my_work.org.get_distance(my_work,worker(i).my_work) + DEFAULT_HORIZONTAL_DISTANCE_UNIT=0?1:0 )^org_kindship_factor);
 		} else {
-			kinship <- 0.0;
+			k <- 0.0;
 		}
-		return kinship;
+		return k;
 	}
 	
 	// ---------------------
@@ -368,27 +393,37 @@ species worker parent:individual {
 	 * Get closer to evaluation criteria from assimilated individuals and away from contrasting ones
 	 */
 	action contrast_and_assimilation(list<worker> interact_with <- __social_references) {
-		float t; map<worker,float> interact_magnitude;
+		float t <- 0.0; map<worker,float> interact_magnitude;
 		if DEBUG_WORKER and DEBUG_TARGET contains self {t <- machine_time;}
 		
 		loop sr over:interact_with { 
 			
-			float assim <- get_anchor(sr, get_organizational_kinship(sr));
-			list<characteristic> wcs <- nb_wc_exchange among (_work_aspects.keys union sr._work_aspects.keys);
+			float assim <- get_anchor(sr, (kinship?get_organizational_kinship(sr):1.0));
+			if 0.0 > assim or assim > 1.0 {
+				ask world { do syso("Assimilation should be between 0 and 1", caller::myself, 
+					action_name::"contrast_and_assimilation", level::last(debug_levels));
+				}
+			}
 			
-			if t != 0 {interact_magnitude[sr] <- assim;}
+			list<characteristic> wcs <- _work_aspects.keys union sr._work_aspects.keys;
+			wcs <- nb_wc_exchange=0 ? wcs : nb_wc_exchange among wcs;
+			
+			if t != 0.0 {interact_magnitude[sr] <- assim;}
 			loop wc over:wcs {	
 				list<float> mine <- work_evaluator[wc];
 				list<float> yours <- sr.work_evaluator[wc];
 				
 				loop i from:1 to:length(mine)-1 {
 					float diff <- mine[i] - yours[i];
-					mine[i] <- mine[i] + diff * (2 * assim - 1);
+					
+					// TODO : discard if work evaluator dimension is too different
+					if abs(diff) < mine[i]*assim*open_to_new_ideas() { mine[i] <- mine[i] + diff * (2 * assim - 1); } 
+					
 				}	
 			}
 		}
 		
-		if DEBUG_WORKER and t != 0 { 
+		if DEBUG_WORKER and t != 0.0 { 
 			ask world { do syso(sample(interact_magnitude),machine_time-t,myself,"contrast_and_assimilation",debug_level(0)); }
 		}
 	}
@@ -408,12 +443,10 @@ species worker parent:individual {
 		loop dc over:compare_to._demographics.keys {
 			if close > dc.ambiguity and dc.compare_values(compare_to._demographics[dc],_demographics[dc])=0 {similarities <- similarities+1;}
 		}
-		list<characteristic> anchors <- compare_to._work_aspects.keys where ( each.ambiguity < close );
+		list<characteristic> anchors <- compare_to._work_aspects.keys where (_work_aspects contains_key each and each.ambiguity < close );
 		nb_anchors <- nb_anchors + length(anchors); 
 		loop anchor over:anchors {
-			if _work_aspects contains_key anchor {
-				if anchor.compare_values(_work_aspects[anchor],compare_to._work_aspects[anchor]) = 0 {similarities <- similarities+1;}
-			}
+			  if anchor.compare_values(_work_aspects[anchor],compare_to._work_aspects[anchor]) = 0 {similarities <- similarities+1;}
 		}
 		return similarities / nb_anchors;
 	}
@@ -433,7 +466,7 @@ species worker parent:individual {
 		
 		if 0 > andness or andness > 1 {
 			error sample(andness)+" should be "+(0>andness?"higher than 0":"lower than 1")
-				+" -- See var "+sample(_n)+sample(minmax_n.y)+sample(rho_neuroticism_weight);
+				+" -- See var "+sample(_n)+sample(minmax_n.y)+sample(_rho_neuroticism_weight);
 		}
 		
 		// Weights given by value ordering, with andness parameter
@@ -485,14 +518,6 @@ species worker parent:individual {
         }
         return s;
 	}
-	
-	// weight of neuroticism on cognitive aspect of negative evaluation
-	float rho_neuroticism_weight <- default_neu_rho;
-	
-	/*
-	 * How much bad experience is weighted upon work characteristic evaluation
-	 */
-	float rho_agg(float neuroticism_weight <- rho_neuroticism_weight) { return _n / minmax_n.y * neuroticism_weight; }
 	
 	// ------- //
 	// EMOTION //
