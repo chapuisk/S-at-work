@@ -163,7 +163,7 @@ species organization {
 	
 	// The organizational distance between job 'w1' and job 'w2'
 	int get_distance(work w1, work w2) {
-		if w1 = w2 {return 0;}
+		if length(orga)=1 {return DEFAULT_HORIZONTAL_DISTANCE_UNIT;}
 		position p1 <- get_position(w1);
 		position p2 <- get_position(w2);
 		if p1 = p2 {return DEFAULT_HORIZONTAL_DISTANCE_UNIT;} 

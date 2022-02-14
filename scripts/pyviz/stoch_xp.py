@@ -5,7 +5,7 @@ import math
 import seaborn as sns
 
 # Data
-data = pd.read_csv("../../batch_output/stochastic_xp2.csv")
+data = pd.read_csv("../../batch_output/stochastic_xp.csv")
 
 print(data["a index"].drop_duplicates())
 

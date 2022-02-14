@@ -157,10 +157,10 @@ global {
 		loop r over:rows_list(p.value) { pac <+ last(r); eac <+ predict(above_c,[first(r)]); }
 		float pvalue_ac <- t_test(pac,eac);
 		
-		if first(below_c.parameters) < 0 { res <- res + 1 - pvalue_bc; }
-		if first(above_c.parameters) > 0 { res <- res + 1 - pvalue_ac; }
+		if first(below_c.parameters) < 0 { res <- res * (1 - pvalue_bc); }
+		if first(above_c.parameters) > 0 { res <- res * (1 - pvalue_ac); }
 		
-		return res/3;
+		return res;
 	}
 
 }

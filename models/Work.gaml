@@ -108,7 +108,7 @@ global {
 	// Create the simplest work comprising 'nb_tasks' inner tasks and basic work characteristics (i.e. salary, working time and contract)
 	work create_simple_work(int nb_tasks <- 0, pair<int,int> salary_range <- nil, 
 		pair<float,float> working_hours <- avr_working_hours::std_working_hours, 
-		map<string,float> contract_weight <- contract_types_weights 
+		map<string,float> c_weight <- contract_types_weights 
 	) {
 		create task number:nb_tasks returns:t;
 		int s <- int(SALARY.get_numerical_value(first(SALARY.get_space())));
@@ -117,7 +117,7 @@ global {
 		create work with:[tasks::t,
 			salary::s,
 			working_time_per_week::gauss(working_hours.key,working_hours.value),
-			contract::rnd_choice(contract_weight)
+			contract::rnd_choice(c_weight)
 		] returns:w;
 		return first(w);
 	}
