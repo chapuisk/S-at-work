@@ -24,12 +24,9 @@ global {
 	
 	// GLOBAL VARIABLES
 	observer main_observer;
-	float s_index -> sat_dist_index(main_observer);
-	float s_index_batch;
-	float g_index -> gender_pearson(main_observer);
-	float g_index_batch;
-	float a_index -> age_pseudo_two_lines_index(main_observer);
-	float a_index_batch;
+	float s_index;
+	float g_index;
+	float a_index;
 	
 	float avr_sat_batch;
 	int end_cycle_batch;
@@ -41,7 +38,7 @@ global {
 	// PARAMETERS
 	
 	// Input
-	int nb_agent init:1000 parameter:true category:"Agent init";
+	int nb_agent init:100 parameter:true category:"Agent init";
 	
 	// Observer
 	int windows init:4 parameter:true category:"Observer"; // PARAMETER
@@ -51,10 +48,11 @@ global {
 	
 	// Cog
 	int default_agent_memory <- 5; // length of sat memory (for peak-end)
+	float default_contrast_effect <- 1.0; // the pourcentage of the contrasting effect
 	
 	// 5-traits
 	float extra_selection <- 0.0 parameter:true min:0.0 max:1.0 category:"Personality"; // Tendency to reject middle judgement (average satisfaction)
-	float default_new_mode <- 0.2 parameter:true min:0.0 max:1.0 category:"Personality"; // Tendency to accept new ideas (openess) or to be empatic (agreableness)
+	float default_new_mode <- 0.1 parameter:true min:0.0 max:1.0 category:"Personality"; // Tendency to accept new ideas (openess) or to be empatic (agreableness)
 	
 	// W-OWA
 	bool default_rnd_wc_weights <- false parameter:true category:"W-OWA";
@@ -81,7 +79,7 @@ global {
 	string net_type <- "Complet" among:["Random","ScaleFree","SmallWorld","Complet"];
 	int net_type_sobol <- -1;
 	
-	int erdos_renyi_k <- 4 min:1 max:20;
+	int erdos_renyi_k <- 2 min:1 max:20;
 	
 	int barabasi_start <- 10 min:1 max:int(nb_agent/4);
 	int barabasi_m <- 4 min:1 max:nb_agent;
@@ -244,7 +242,10 @@ global {
 	/*
 	 * Trigger output computation and stop simulation if not batch mode
 	 */
-	reflex observ when:not(batch_mode) and stop_sim() {if not(empty(action_benchmark)) {do syso(sample(action_benchmark));} do pause;}
+	reflex observ when:not(batch_mode) {
+		if not(empty(action_benchmark)) {do syso(sample(action_benchmark));}
+		if stop_sim() { do pause; }
+	}
 	
 	// -------------------------------------------- //
 	// ------------------- LOGS ------------------- //
@@ -299,7 +300,7 @@ experiment "abstract_xp" virtual:true type:gui {
 		display "satisfaction" type:java2D {
 			chart "satisfaction" type: series legend_font:font(0.0) series_label_position:none style:line {
 				loop w over:worker {
-					data "sat"+int(w) value:w._job_satisfaction color:rnd_color(int(w)/length(worker)*255);
+					data "sat"+int(w) value:w._job_satisfaction color:rgb(int(w)/length(worker)*255);
 				}
 			}
 		}
@@ -362,7 +363,7 @@ experiment abstract_batch virtual:true type:batch until:world.stop_sim() {
 		
 		ask simulations {
 			save [int(self),self.end_cycle_batch,self.avr_sat_batch,
-				self.s_index_batch,self.g_index_batch,self.a_index_batch]
+				self.s_index,self.g_index,self.a_index]
 				 +self.main_observer.qSat
 				+[self.main_observer.gSat["W"][MOMENTS index_of MIN],
 					self.main_observer.gSat["W"][MOMENTS index_of AVR],

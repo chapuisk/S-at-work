@@ -19,7 +19,7 @@ global {
 	float WC_WEIGHT_CONSTANT <- 1.0;
 	point WC_WEIGHT_DEFAULT <- {0,1}; // uniform draw min (x) and max (y)
 	point WARR_MULTI_DEFAULT <- {1,1}; // truncated gaussian mean (x) and deviation (y)
-	point WARR_BASELOG_DEFAULT <- {#e,0}; // truncated gaussian mean (x) and deviation (y)
+	point WARR_BASELOG_DEFAULT <- {#e,#e}; // truncated gaussian mean (x) and deviation (y)
 	point WARR_NUTRIMENT_DEFAULT <- {1,5}; // uniform draw min (x) and max (y)
 	
 	// --------------------------- //
@@ -55,7 +55,7 @@ global {
 	}
 	
 	// Default nutriment behavior
-	list<float> warr_mode(float weight,  float nutriment, float multiplicator <- -1, int base_log <- -1) {
+	list<float> warr_mode(float weight,  float nutriment, float multiplicator <- -1, int base_log <- WARR_BASELOG_DEFAULT.x) {
 		return [
 			weight<=0?rnd(WC_WEIGHT_DEFAULT.x,WC_WEIGHT_DEFAULT.y):weight,
 			multiplicator<=0?truncated_gauss(WARR_MULTI_DEFAULT.x,WARR_MULTI_DEFAULT.y):multiplicator,
@@ -91,7 +91,7 @@ global {
 	/*
 	 * DEBUG MODE FOR WORKERS
 	 */
-	bool DEBUG_WORKER <- true;
+	bool DEBUG_WORKER <- false;
 	float DEBUG_PROP <- 1.0;
 	list<worker> DEBUG_TARGET <- [];
 	
@@ -389,6 +389,8 @@ species worker parent:individual {
 	
 	int nb_wc_exchange <- default_nb_wchar_ex;
 	
+	float contrast <- default_contrast_effect;
+	
 	/*
 	 * Get closer to evaluation criteria from assimilated individuals and away from contrasting ones
 	 */
@@ -405,19 +407,16 @@ species worker parent:individual {
 				}
 			}
 			
-			list<characteristic> wcs <- _work_aspects.keys union sr._work_aspects.keys;
-			wcs <- nb_wc_exchange=0 ? wcs : nb_wc_exchange among wcs;
-			
 			if t != 0.0 {interact_magnitude[sr] <- assim;}
-			loop wc over:wcs {	
-				list<float> mine <- work_evaluator[wc];
+			loop wc over:(nb_wc_exchange=0 ? _work_aspects.keys : nb_wc_exchange among _work_aspects.keys) {	
+				list<float> mine <- copy(work_evaluator[wc]);
 				list<float> yours <- sr.work_evaluator[wc];
 				
 				loop i from:1 to:length(mine)-1 {
-					float diff <- mine[i] - yours[i];
+					float val <- mine[i]; float diff <- val - yours[i];
 					
 					// TODO : discard if work evaluator dimension is too different
-					if abs(diff) < mine[i]*assim*open_to_new_ideas() { mine[i] <- mine[i] + diff * (2 * assim - 1); } 
+					if abs(diff) < val*assim*open_to_new_ideas() { work_evaluator[wc][i] <- val + diff * ((1+contrast) * assim - contrast); } 
 					
 				}	
 			}
@@ -438,6 +437,8 @@ species worker parent:individual {
 	 * 
 	 */
 	float get_anchor(worker compare_to, float close) {
+		float t <- 0.0;
+		if DEBUG_WORKER and DEBUG_TARGET contains self {t <- machine_time;}
 		float similarities;
 		int nb_anchors <- length(_demographics);
 		loop dc over:compare_to._demographics.keys {
@@ -447,6 +448,9 @@ species worker parent:individual {
 		nb_anchors <- nb_anchors + length(anchors); 
 		loop anchor over:anchors {
 			  if anchor.compare_values(_work_aspects[anchor],compare_to._work_aspects[anchor]) = 0 {similarities <- similarities+1;}
+		}
+		if DEBUG_WORKER and t != 0.0 { 
+			ask world { do syso("Achor process",machine_time-t,myself,"get_anchor",debug_level(0)); }
 		}
 		return similarities / nb_anchors;
 	}

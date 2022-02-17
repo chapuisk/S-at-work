@@ -43,15 +43,12 @@ global {
 	bool stop_sim(float epsilon <- EPSILON) { 
 		bool stop <- sats none_matches (length(each) < windows or abs(min(each) - max(each)) > epsilon);
 		if stop {
-			ask main_observer {do end_outputs;}
-			if batch_mode { 
-				ask main_observer { do update_qSat; do update_aSat; do update_gSat; }
-				s_index_batch <- sat_dist_index(main_observer);
-				g_index_batch <- gender_pearson(main_observer);
-				a_index_batch <- age_pseudo_two_lines_index(main_observer); 
-				avr_sat_batch <- mean(worker collect (each._job_satisfaction));
-				end_cycle_batch <- cycle;	
-			}
+			ask main_observer { do end_outputs; do update_qSat; do update_aSat; do update_gSat; }
+			s_index <- sat_dist_index(main_observer);
+			g_index <- gender_pearson(main_observer);
+			a_index <- age_pseudo_two_lines_index(main_observer); 
+			avr_sat_batch <- mean(worker collect (each._job_satisfaction));
+			end_cycle_batch <- cycle;
 		}
 		return stop;
 	}
@@ -190,7 +187,7 @@ species observer {
 	// ------------------------------ //
 	// REFLEXES
 
-	int freq <- 1;
+	int freq <- 10;
 
 	/*
 	 * Step wise output computation
