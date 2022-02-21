@@ -158,7 +158,7 @@ species individual virtual:true {
 /*
  * Main active entity of the model, inherit from individual in all aspect related to personnality, demographics and social references
  */
-species worker parent:individual {
+species worker parent:individual schedules:shuffle(worker) {
 	
 	init {
 		
@@ -167,10 +167,14 @@ species worker parent:individual {
 		
 		// length of memery
 		__memory_length <- default_agent_memory;
+		// Forget probability
+		__refresh_memory_proba <- default_probability_to_forget;
 		// Does agent update social referents?
 		__update_social_references <- default_update_social_referents;
 		// Number of social contacts for each work evaluation
 		__nb_interactions_with_social_references <- default_nb_contacts;
+		// Fake job satisfaction
+		_job_satisfaction <- 1.0;
 		
 		// HETEROGENEOUS INIT
 	}
@@ -188,7 +192,9 @@ species worker parent:individual {
 	
 	// PEAK-END KANHEMAN HEURISTICS
 	int __memory_length; // how long do we recall freezed satisfaction
+	float __refresh_memory_proba;
 	list<float> __sat_memory;
+	float peak_memory <- -1.0;
 	
 	// Should be event based
 	bool __update_work_eval -> every(step);
@@ -233,10 +239,26 @@ species worker parent:individual {
 	 * Finally assess one's attitude toward job
 	 */
 	reflex update_attitude_toward_job {
+		// elicit emotions
 		if disable_emotion { emotional_balance <- 0.0; } else { emotional_balance <- emotional_balance_weigth();}
-		_job_satisfaction <- (__sat_memory max_of (abs(each)) + _cognitive_resp) / 2 * (1 - emotional_balance) + emotional_resp * emotional_balance;
-		if length(__sat_memory) = __memory_length { __sat_memory >- first(__sat_memory); }
+		
+		// compute attitude
+		_job_satisfaction <- ((peak_memory<0?_cognitive_resp:peak_memory) + _cognitive_resp) / 2 * (1 - emotional_balance) + emotional_resp * emotional_balance;
+	}
+	
+	/*
+	 * Last update memory
+	 */
+	reflex update_memory {
+		// Memory process
+		if length(__sat_memory) = __memory_length and flip(__refresh_memory_proba) { 
+			__sat_memory >- first(__sat_memory);
+		}
 		__sat_memory <+ _job_satisfaction;
+		
+		// Revise peak memory
+		float current_peak_memory <- __sat_memory max_of (abs(each - _job_satisfaction));
+		if abs(current_peak_memory-_job_satisfaction)>abs(peak_memory-_job_satisfaction) {peak_memory <- current_peak_memory;}
 	}
 
 	// ---------- //
@@ -407,19 +429,27 @@ species worker parent:individual {
 				}
 			}
 			
+			float t1 <- machine_time;
 			if t != 0.0 {interact_magnitude[sr] <- assim;}
 			loop wc over:(nb_wc_exchange=0 ? _work_aspects.keys : nb_wc_exchange among _work_aspects.keys) {	
 				list<float> mine <- copy(work_evaluator[wc]);
 				list<float> yours <- sr.work_evaluator[wc];
 				
+				float t2 <- machine_time;
 				loop i from:1 to:length(mine)-1 {
 					float val <- mine[i]; float diff <- val - yours[i];
 					
-					// TODO : discard if work evaluator dimension is too different
-					if abs(diff) < val*assim*open_to_new_ideas() { work_evaluator[wc][i] <- val + diff * ((1+contrast) * assim - contrast); } 
-					
-				}	
+					if diff > 0 {
+						// Bound confidence
+						
+						if val=0?abs(diff)<open_to_new_ideas():abs(diff)/val<open_to_new_ideas(){
+							work_evaluator[wc][i] <- val + diff * ((1+contrast) * assim - contrast);
+						}
+					}
+				}
+				if DEBUG_WORKER {ask world { do syso("BC",machine_time-t2,myself,"BC",debug_level(0));}}	
 			}
+			if DEBUG_WORKER {ask world {do syso("WC",machine_time-t1,myself,"WC",debug_level(0));}}
 		}
 		
 		if DEBUG_WORKER and t != 0.0 { 
