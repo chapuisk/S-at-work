@@ -17,6 +17,8 @@ global {
 	string model_source_folder <- "../";
 	bool DEBUG_MOD <- true;
 	string LEVEL <- "DEBUG";
+	
+	int end_cycle_criterion <- 100;
 
 	/*
 	 * Bind workers and jobs withtin an organization

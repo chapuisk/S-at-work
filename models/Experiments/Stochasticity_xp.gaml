@@ -13,8 +13,10 @@ import "../Global.gaml"
 global {
 	
 	string model_source_folder <- "../";
-	string res_file <- "stochastic_xp3.csv";
+	string res_file <- "stochastic_xp.csv";
 	bool DEBUG_MOD <- true;
+	
+	int end_cycle_criterion <- 100;
 	
 	// Random weights of work characteristics
 	float WC_WEIGHT_CONSTANT <- 0.0;

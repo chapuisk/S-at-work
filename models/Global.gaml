@@ -41,13 +41,14 @@ global {
 	int nb_agent init:100 parameter:true category:"Agent init";
 	
 	// Observer
-	int windows init:4 parameter:true category:"Observer"; // PARAMETER
+	int windows init:10 parameter:true category:"Observer"; // PARAMETER
 	int q_number init:10 min:4 max:10 parameter:true category:"Observer"; // PARAMETER
 	
 	// *************** //
 	
 	// Cog
 	int default_agent_memory <- 5; // length of sat memory (for peak-end)
+	float default_probability_to_forget <- 1.0; // Probability to forget the oldest job satisfaction memorized
 	float default_contrast_effect <- 1.0; // the pourcentage of the contrasting effect
 	
 	// 5-traits

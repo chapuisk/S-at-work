@@ -30,6 +30,9 @@ global {
 	// ########################
 	// Job Satisfaction stability
 	
+	float stability_critetion <- 0.01;
+	float end_cycle_criterion <- #infinity;
+	
 	// Window of agent satisfaction
 	list<list<float>> sats;
 	
@@ -40,8 +43,10 @@ global {
 	
 	// stop the simulation if satisfaction does not move more than 'epsilon' in a 'windows' time frame for every agent
 	// TODO : have a end cycle in case there is no equilibria state reached
-	bool stop_sim(float epsilon <- EPSILON) { 
-		bool stop <- sats none_matches (length(each) < windows or abs(min(each) - max(each)) > epsilon);
+	bool stop_sim(float epsilon <- stability_critetion, int end_cycle <- end_cycle_criterion) {
+		if cycle < windows {return false;}
+		bool stop <- cycle = end_cycle or sats none_matches (standard_deviation(each) > epsilon * mean(each));
+			//sats none_matches (abs(min(each)-max(each))/max(each) > epsilon); 
 		if stop {
 			ask main_observer { do end_outputs; do update_qSat; do update_aSat; do update_gSat; }
 			s_index <- sat_dist_index(main_observer);
