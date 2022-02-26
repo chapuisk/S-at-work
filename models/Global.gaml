@@ -56,7 +56,6 @@ global {
 	float default_new_mode <- 0.1 parameter:true min:0.0 max:1.0 category:"Personality"; // Tendency to accept new ideas (openess) or to be empatic (agreableness)
 	
 	// W-OWA
-	bool default_rnd_wc_weights <- false parameter:true category:"W-OWA";
 	float default_neu_rho <- 0.0 parameter:true min:0.0 max:1.0 category:"W-OWA"; // strenght of neuroticism on wowa: over weight the least satisfiying aspects of job
 	float default_gamma <- 1.0 parameter:true min:0.001 max:1.0 category:"W-OWA"; // weight of weights in wowa
 	

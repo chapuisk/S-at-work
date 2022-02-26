@@ -198,6 +198,7 @@ species worker parent:individual schedules:shuffle(worker) {
 	
 	// Should be event based
 	bool __update_work_eval -> every(step);
+	bool __update_work_eval_criterias <- true;
 	
 	/*
 	 * First update the perception of work characteristics <br>
@@ -232,7 +233,7 @@ species worker parent:individual schedules:shuffle(worker) {
 	 * Third evaluate work characteristics
 	 */
 	reflex update_cognitive_resp when:__update_work_eval {
-		do socio_cognitive_evaluation_of_work(__update_social_references, __nb_interactions_with_social_references);
+		do socio_cognitive_evaluation_of_work(__update_work_eval_criterias, __update_social_references, __nb_interactions_with_social_references);
 	}
 	
 	/*
@@ -288,13 +289,8 @@ species worker parent:individual schedules:shuffle(worker) {
 	/*
 	 * Update cognitive work aspect
 	 */
-	action socio_cognitive_evaluation_of_work(bool update_social_ref <- true, int nb_interactions <- -1) {
-		
-		// Update evaluation criterion
-		if empty(__social_references) or update_social_ref {__social_references <- update_social_references();}
-		if nb_interactions <= 0 {do contrast_and_assimilation;}
-		else {do contrast_and_assimilation(nb_interactions among __social_references);}
-		
+	action socio_cognitive_evaluation_of_work(bool update_eval_criterias <- true, bool update_social_ref <- true, int nb_interactions <- -1) {
+		if (update_eval_criterias) {do update_evaluation_criterias(update_social_ref,nb_interactions);}
 		float t;
 		if DEBUG_WORKER and DEBUG_TARGET contains self {t <- machine_time;}
 		
@@ -315,6 +311,12 @@ species worker parent:individual schedules:shuffle(worker) {
 		if DEBUG_WORKER and t != 0 { 
 			ask world { do syso(sample(myself._cognitive_resp),machine_time-t,myself,"WOWA",debug_level(0)); }
 		}
+	}
+		
+	action update_evaluation_criterias(bool update_social_ref, int nb_interactions) {
+		if empty(__social_references) or update_social_ref {__social_references <- update_social_references();}
+		if nb_interactions <= 0 {do contrast_and_assimilation;}
+		else {do contrast_and_assimilation(nb_interactions among __social_references);}
 	}
 	
 	// ---------------------------

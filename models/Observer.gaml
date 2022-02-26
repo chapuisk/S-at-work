@@ -25,6 +25,13 @@ global {
 		create observer with:[target_agents::list(worker),freq::1];
 		main_observer <- first(observer);
 		sats <- []; loop times:length(worker) {sats <+ [];}
+		// WOMEN & MEN WORK PROFILES
+		list<worker> womens <- worker where (each.get(GENDER)="W");
+		list<worker> mens <- worker where (each.get(GENDER)="M");
+		loop wc over:WORK_CHARACTERISTICS {
+			women_work_aspects[wc] <- wc.overall_is(womens collect (each._work_aspects[wc]));
+			men_work_aspects[wc] <- wc.overall_is(mens collect (each._work_aspects[wc]));
+		}
 	}
 	
 	// ########################
@@ -123,6 +130,9 @@ global {
 	// #########################
 	// GENDER SATISFACTION
 	
+	map<characteristic, string> women_work_aspects;
+	map<characteristic, string> men_work_aspects;
+	
 	/*
 	 * Pearson's correlation coefficient
 	 * - if it is positive, it means women (numerical code is 1) are more satisfied <p>
@@ -130,10 +140,39 @@ global {
 	 */
 	float gender_pearson(observer obs) {
 		if obs.gender_sat=nil or empty(obs.gender_sat) {return 0.0;}
-		return correlation(
+		float corr <- correlation(
 			obs.gender_sat collect (each.key),
 			obs.gender_sat collect (each.value)
 		);
+		
+		// TODO : replace the hand made warr model by a 'model' (témoin) worker
+		// Doing this there is only cognitive evaluation 
+		
+//		map<characteristic, list<float>> warrs_global_evaluator;
+//		loop wc over:WORK_CHARACTERISTICS {
+//			list<float> ev; 
+//			loop idx over:range(0,3) {
+//				ev <+ mean(worker collect (each.work_evaluator[wc][idx]));
+//			}
+//			warrs_global_evaluator[wc] <- ev;
+//		}
+//		
+//		create worker returns: wworker { _work_aspects <- women_work_aspects; work_evaluator <- warrs_global_evaluator; }
+//		worker womod <- first(wworker);
+//		ask womod {do socio_cognitive_evaluation_of_work(update_eval_criterias::false);}
+//		create worker returns: mworker { _work_aspects <- men_work_aspects; work_evaluator <- warrs_global_evaluator; }
+//		worker memod <- first(mworker);
+//		ask memod {do socio_cognitive_evaluation_of_work(update_eval_criterias::false);}
+//		
+//		float exp_diff <- womod._cognitive_resp - memod._cognitive_resp;
+//		
+//		ask [womod,memod] {do die;}
+//		
+//		if exp_diff < 0 and corr > 0 { return abs(exp_diff) * corr; }
+//		if exp_diff > 0 and corr < 0 { return exp_diff * corr; }
+
+		return corr;
+		
 	}
 	
 	// #########################
@@ -150,7 +189,8 @@ global {
 		float sbm <- mean((worker where (each.numerical(AGE) < c-c_flat)) collect (each._job_satisfaction));
 		float sbp <- mean((worker where (each.numerical(AGE) > c+c_flat)) collect (each._job_satisfaction));
 		
-		float res <- sb<sbm?(sb<sbp?1:0.5):0.0;
+		float rightup <- (sb<sbp?0.5:0.0);
+		float leftdown <- (sb<sbm?0.5:0.0);
 		
 		list pbc <- []; list ebc <- [];
 		loop r over:rows_list(p.key) { pbc <+ last(r); ebc <+ predict(below_c,[first(r)]); } 
@@ -159,10 +199,11 @@ global {
 		loop r over:rows_list(p.value) { pac <+ last(r); eac <+ predict(above_c,[first(r)]); }
 		float pvalue_ac <- t_test(pac,eac);
 		
-		if first(below_c.parameters) < 0 { res <- res * (1 - pvalue_bc); }
-		if first(above_c.parameters) > 0 { res <- res * (1 - pvalue_ac); }
 		
-		return res;
+		if first(below_c.parameters) < 0 { leftdown <- leftdown * (1 - pvalue_bc); }
+		if first(above_c.parameters) > 0 { rightup <- rightup * (1 - pvalue_ac); }
+		
+		return leftdown+rightup;
 	}
 
 }
