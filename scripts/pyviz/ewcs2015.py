@@ -55,8 +55,10 @@ filtered_data = filtered_data.replace(r'^s*$', float('NaN'), regex=True)
 filtered_data.dropna()
 
 # Remove nodata
+filtered_data = filtered_data[~filtered_data['Q2b'].isin([888, 999]) ]
 filtered_data = filtered_data[~filtered_data['Q11'].isin(['5', '6', '8', '9'])]
 filtered_data = filtered_data[~filtered_data['Q24'].isin([888, 999])]
+filtered_data = filtered_data[~filtered_data['Q88'].isin([8, 9])]
 filtered_data = filtered_data[~filtered_data['Q104_euro'].isin([88888888.0, 99999999.0])]
 
 for l5 in ['Q61c', 'Q61i', 'Q61n', 'Q61a', 'Q63d', 'Q70e', 'Q61j', 'Q61h']:
