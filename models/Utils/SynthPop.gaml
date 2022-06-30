@@ -67,11 +67,12 @@ global {
 			+with_precision(((machine_time-t)/1000),2)+"s"
 		);
 		
-		save [AGE.name,GENDER.name,EDUCATION.name,FAMILY.name] + WORK_CHARACTERISTICS collect (each.name)  
+		save [AGE.name,GENDER.name,EDUCATION.name,FAMILY.name] + WORK_CHARACTERISTICS collect (each.name) + ["Declared satisfaction"]  
 			to:output_file type:csv header:false rewrite:true;
 		loop w over:worker {
 			save [w.get(AGE),w.get(GENDER),w.get(EDUCATION),w.get(FAMILY)]
 				+ WORK_CHARACTERISTICS collect (w._work_aspects[each])
+				+ [w.__declared_sat]
 				to:output_file type:csv rewrite:false;
 		}
 		
@@ -279,12 +280,20 @@ global {
 			dist <+ fit;
 		}
 		int drawn_rec <- rnd_choice(dist);
+		int ds <- int(ewcs_data[9,drawn_rec]);
+		loop while:ds=9 or ds=8 {
+			drawn_rec <- rnd_choice(dist);
+			ds <- int(ewcs_data[9,drawn_rec]);
+		}
 		
 		// TODO : ideally we should define jobs characteristics that fit perceptions rather than force perceptions
 		w._work_aspects[eijqi_autonomy] <- ewcs_data[10,drawn_rec];
 		w._work_aspects[eijqi_interaction] <- ewcs_data[11,drawn_rec];
 		w._work_aspects[eijqi_intensity] <- ewcs_data[12,drawn_rec];
 		w._work_aspects[eijqi_meaningful] <- ewcs_data[13,drawn_rec];
+		
+		// regarding work conditions - 1=very sat 2=sat 3=not very sat 4=not at all sat
+		w.__declared_sat <- ds;
 		
 		// Change working time for a real one
 		my_work.working_time_per_week <- float(ewcs_data[6,drawn_rec]); 

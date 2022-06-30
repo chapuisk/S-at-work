@@ -29,6 +29,7 @@ global {
 	float a_index;
 	
 	float avr_sat_batch;
+	float fit_batch;
 	int end_cycle_batch;
 	
 	// CONSTANTS
@@ -41,22 +42,29 @@ global {
 	int nb_agent init:100 parameter:true category:"Agent init";
 	
 	// Observer
-	int windows init:10 parameter:true category:"Observer"; // PARAMETER
+	int observer_window init:10 parameter:true category:"Observer"; // PARAMETER
 	int q_number init:10 min:4 max:10 parameter:true category:"Observer"; // PARAMETER
 	
 	// *************** //
 	
+	// Sub-models
+	
+	bool peakEndMod <- true;
+	bool warrMod <- true;
+	bool socCompMod <- true;
+	bool wowaMod <- true;
+	
 	// Cog
-	int default_agent_memory <- 5; // length of sat memory (for peak-end)
+	int default_agent_memory <- -1; // length of sat memory (for peak-end)
 	float default_probability_to_forget <- 1.0; // Probability to forget the oldest job satisfaction memorized
 	float default_contrast_effect <- 1.0; // the pourcentage of the contrasting effect
 	
 	// 5-traits
 	float extra_selection <- 0.0 parameter:true min:0.0 max:1.0 category:"Personality"; // Tendency to reject middle judgement (average satisfaction)
 	float default_new_mode <- 0.1 parameter:true min:0.0 max:1.0 category:"Personality"; // Tendency to accept new ideas (openess) or to be empatic (agreableness)
+	float default_neu_rho <- 0.0 parameter:true min:0.0 max:1.0 category:"Personality"; // strenght of neuroticism on wowa: over weight the least satisfiying aspects of job
 	
 	// W-OWA
-	float default_neu_rho <- 0.0 parameter:true min:0.0 max:1.0 category:"W-OWA"; // strenght of neuroticism on wowa: over weight the least satisfiying aspects of job
 	float default_gamma <- 1.0 parameter:true min:0.001 max:1.0 category:"W-OWA"; // weight of weights in wowa
 	
 	// Warr's function
@@ -155,6 +163,7 @@ global {
 				_demographics[GENDER] <- wl[1];
 				_demographics[EDUCATION] <- wl[2];
 				_demographics[FAMILY] <- wl[3];
+				__declared_sat <- int(last(wl));
 				ask world {do random_gaussian_personality(myself);}
 				int idx <- 4;
 				loop c over:WORK_CHARACTERISTICS { 
@@ -340,6 +349,7 @@ experiment "abstract_xp" virtual:true type:gui {
  		monitor "sat distribution" value:s_index;
 		monitor "sat gender" value:g_index;
 		monitor "sat age" value:a_index;
+		monitor "fitness" value:fit_batch;
 	}
 }
 
@@ -354,7 +364,7 @@ experiment abstract_batch virtual:true type:batch until:world.stop_sim() {
 	reflex end_batch {
 		
 		if int(first(simulations))=0 {
-			save ["Sim id","end cycle","avr sat","s index","g index","a index",
+			save ["Sim id","end cycle","fit","avr sat","s index","g index","a index",
 				"sq1","sq2","sq3","sq4","sq5","sq6","sq7","sq8","sq9","sq10",
 				"wmin","wavr","wmax","mmin","mavr","mmax",
 				"a25","a35","a45","a55","a65","a"+MAX_AGE] 
@@ -362,8 +372,8 @@ experiment abstract_batch virtual:true type:batch until:world.stop_sim() {
 		}
 		
 		ask simulations {
-			save [int(self),self.end_cycle_batch,self.avr_sat_batch,
-				self.s_index,self.g_index,self.a_index]
+			save [int(self),self.end_cycle_batch, self.fit_batch,
+				self.avr_sat_batch, self.s_index,self.g_index,self.a_index]
 				 +self.main_observer.qSat
 				+[self.main_observer.gSat["W"][MOMENTS index_of MIN],
 					self.main_observer.gSat["W"][MOMENTS index_of AVR],

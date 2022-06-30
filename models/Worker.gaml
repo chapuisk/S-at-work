@@ -13,55 +13,66 @@ import "Global.gaml"
 
 global {
 	
-	// ----------------- //
-	// WARR'S MODEL INIT //
-	
-	float WC_WEIGHT_CONSTANT <- 1.0;
-	point WC_WEIGHT_DEFAULT <- {0,1}; // uniform draw min (x) and max (y)
-	point WARR_MULTI_DEFAULT <- {1,1}; // truncated gaussian mean (x) and deviation (y)
-	point WARR_BASELOG_DEFAULT <- {#e,#e}; // truncated gaussian mean (x) and deviation (y)
-	point WARR_NUTRIMENT_DEFAULT <- {1,5}; // uniform draw min (x) and max (y)
-	
 	// --------------------------- //
 	// Work characteristic weights //
 	
-	float salary_weight <- WC_WEIGHT_CONSTANT;
-	float working_time_weight <- WC_WEIGHT_CONSTANT;
-	float contract_weight <- WC_WEIGHT_CONSTANT;
-	float autonomy_weight <- WC_WEIGHT_CONSTANT;
-	float interaction_weight <- WC_WEIGHT_CONSTANT;
-	float intensity_weight <- WC_WEIGHT_CONSTANT;
-	float meaningful_weight <- WC_WEIGHT_CONSTANT;
+	point WC_WEIGHT_DEFAULT <- {0,1}; // uniform draw min (x) and max (y)
+	
+	
+	float salary_weight <- 4.363e-6;
+	float working_time_weight <- 0.01;
+	float contract_weight <- EPSILON;
+	float autonomy_weight <- 0.0714;
+	float interaction_weight <- 0.1622;
+	float intensity_weight <- 0.0636;
+	float meaningful_weight <- 0.2048;
+	
+	// ----------------- //
+	// WARR'S MODEL INIT //
+	
+	int WARR_MULTI_DEFAULT <- 5; // truncated gaussian mean (x) and deviation (y)
+	float BASELOG_DEFAULT <- #e;
+	int NUTRIMENT_BETA <- 5; // How much high value can arose from lognormal nutriment
+	
+	float _working_time_warr_mod <- 35.0; // Expected time for warr's model overshoot 
+	float _autonomy_warr_mod <- 10.0; // Expected level of autonomy for warr's model overshoot
+	float _intensity_warr_mod <- 8.0;
 	
 	/*
 	 * list of warr's parameter model: <\br>
 	 * idx[0] = work characteristic weight <\br>
-	 * idx[1] = multiplicator of the log curve <\br>
-	 * idx[2] = base of the log <\br>
-	 * idx[3] = marginal decrement (if equal 0, vitamine, if superior to 0, nutriment)
+	 * idx[1] = multiplicator of the log curve - i.e. 'a' in ODD <\br>
+	 * idx[2] = base of the log - default e based log <\br>
+	 * idx[3] = marginal decrement (if equal 0, vitamine, if superior to 0, nutriment) - i.e. 'd' in ODD
 	 * TODO: see in WARR's model to init work characteristic evaluation 
 	 */
-	list<float> work_eval(characteristic work_char, float weight <- WC_WEIGHT_CONSTANT) {
+	list<float> work_eval(characteristic work_char, float weight <- -1) {
 		switch work_char {
-			match SALARY {return warr_mode(weight,0.0);} // Pure vitamine
-			match WORKING_TIME {return warr_mode(weight,rnd(WARR_NUTRIMENT_DEFAULT.x,WARR_NUTRIMENT_DEFAULT.y));} // Nutriment
-			match CONTRACT {return warr_mode(weight,0.0);}  // Pure vitamine
-			match eijqi_autonomy {return warr_mode(weight,nutriment::rnd(WARR_NUTRIMENT_DEFAULT.x,WARR_NUTRIMENT_DEFAULT.y));} // Nutriment
-			match eijqi_interaction {return warr_mode(weight,0.0);} // Pure vitamine
-			match eijqi_intensity {return warr_mode(weight,nutriment::rnd(WARR_NUTRIMENT_DEFAULT.x,WARR_NUTRIMENT_DEFAULT.y));} // Nutriment
-			match eijqi_meaningful {return warr_mode(weight,0.0);} // Pure vitamine
-			default {return warr_mode(weight,flip(0.5)?0:rnd(WARR_NUTRIMENT_DEFAULT.x,WARR_NUTRIMENT_DEFAULT.y));} // Coin flip on vitamine or nutriment
+			match SALARY {return warr_mode(salary_weight,0.0);} // Pure vitamine
+			match WORKING_TIME {return warr_mode(working_time_weight,warr_nutriment(_working_time_warr_mod));} // Nutriment
+			match CONTRACT {return warr_mode(contract_weight,0.0);}  // Pure vitamine
+			match eijqi_autonomy {return warr_mode(autonomy_weight,warr_nutriment(_autonomy_warr_mod));} // Nutriment
+			match eijqi_interaction {return warr_mode(interaction_weight,0.0);} // Pure vitamine
+			match eijqi_intensity {return warr_mode(intensity_weight,warr_nutriment(_intensity_warr_mod));} // Nutriment
+			match eijqi_meaningful {return warr_mode(meaningful_weight,0.0);} // Pure vitamine
+			default {return warr_mode(weight,flip(0.5)?0:warr_nutriment(#e));} // Coin flip on vitamine or nutriment
 		}
 	}
 	
-	// Default nutriment behavior
-	list<float> warr_mode(float weight,  float nutriment, float multiplicator <- -1, int base_log <- WARR_BASELOG_DEFAULT.x) {
+	// Way to format and compute warr parameters - 
+	list<float> warr_mode(float weight,  float nutriment, float multiplicator <- -1, int base_log <- BASELOG_DEFAULT) {
 		return [
 			weight<=0?rnd(WC_WEIGHT_DEFAULT.x,WC_WEIGHT_DEFAULT.y):weight,
-			multiplicator<=0?truncated_gauss(WARR_MULTI_DEFAULT.x,WARR_MULTI_DEFAULT.y):multiplicator,
-			base_log<=0?truncated_gauss(WARR_BASELOG_DEFAULT.x,WARR_BASELOG_DEFAULT.y):base_log,
-			nutriment
+			multiplicator<=0?truncated_gauss(WARR_MULTI_DEFAULT,WARR_MULTI_DEFAULT):multiplicator,
+			base_log, nutriment
 		];
+	}
+	
+	/*
+	 * Compute mu accordinng to expected value from lognormal (esperance ou mod de la fonction de densité)
+	 */
+	float warr_nutriment(float mod, float sigma <- 1/NUTRIMENT_BETA) { 
+		return lognormal_rnd(log(#e/(mod*1.5+#e)),sigma);
 	}
 		
 	// ---------------- //
@@ -165,6 +176,9 @@ species worker parent:individual schedules:shuffle(worker) {
 		// HOMOGENEOUS INIT
 		// --
 		
+		// SUB-MODELS
+		__update_work_eval_criterias <- warrMod?socCompMod:false;
+		
 		// length of memery
 		__memory_length <- default_agent_memory;
 		// Forget probability
@@ -186,6 +200,9 @@ species worker parent:individual schedules:shuffle(worker) {
 	
 	// ----------------------------- //
 	
+	// Satisfaction from Data
+	int __declared_sat;
+	
 	// ATTITUDE TOWARD THE JOB //
 	
 	float _job_satisfaction;
@@ -198,7 +215,7 @@ species worker parent:individual schedules:shuffle(worker) {
 	
 	// Should be event based
 	bool __update_work_eval -> every(step);
-	bool __update_work_eval_criterias <- true;
+	bool __update_work_eval_criterias;
 	
 	/*
 	 * First update the perception of work characteristics <br>
@@ -243,8 +260,11 @@ species worker parent:individual schedules:shuffle(worker) {
 		// elicit emotions
 		if disable_emotion { emotional_balance <- 0.0; } else { emotional_balance <- emotional_balance_weigth();}
 		
+		// Elaborate on peak end heuristic or not
+		float cog <- peakEndMod ? ((peak_memory<0?_cognitive_resp:peak_memory) + _cognitive_resp) / 2 : _cognitive_resp;
+		
 		// compute attitude
-		_job_satisfaction <- ((peak_memory<0?_cognitive_resp:peak_memory) + _cognitive_resp) / 2 * (1 - emotional_balance) + emotional_resp * emotional_balance;
+		_job_satisfaction <- cog * (1 - emotional_balance) + emotional_resp * emotional_balance;
 	}
 	
 	/*
@@ -297,7 +317,11 @@ species worker parent:individual schedules:shuffle(worker) {
 		// Assess one job's characteristics impact based on warr's model
 		map<characteristic, pair<float,float>> val_weights <- [];
 		loop wc over:WORK_CHARACTERISTICS {
-			val_weights[wc] <- get_warr_factor(wc, _work_aspects[wc], work_evaluator[wc][1], work_evaluator[wc][2], work_evaluator[wc][3])::work_evaluator[wc][0];
+			if warrMod {
+				val_weights[wc] <- get_warr_factor(wc, _work_aspects[wc], work_evaluator[wc][1], work_evaluator[wc][2], work_evaluator[wc][3])::work_evaluator[wc][0];
+			} else {
+				val_weights[wc] <- wc.get_numerical_value(_work_aspects[wc])::work_evaluator[wc][0];
+			}
 		}
 		
 		if DEBUG_WORKER and t != 0 { 
@@ -306,7 +330,7 @@ species worker parent:individual schedules:shuffle(worker) {
 		}
 		
 		// Aggregate characteristics' impact vector into a single job impact
-		_cognitive_resp <- wowa(val_weights);
+		_cognitive_resp <- wowaMod ? wowa(val_weights) : wa(val_weights);
 		
 		if DEBUG_WORKER and t != 0 { 
 			ask world { do syso(sample(myself._cognitive_resp),machine_time-t,myself,"WOWA",debug_level(0)); }
@@ -395,7 +419,7 @@ species worker parent:individual schedules:shuffle(worker) {
 	float d <- default_d;
 	
 	/*
-	 * basic function is: a * log_b(x + 1) * (tanh(-x*d) + e)
+	 * basic function is: a * log_b(x + 1) * (tanh(-x*d) + b)
 	 * <p>
 	 * when d = 0 pure vitamine (no decrement) </br>
 	 * when d > 0 nutriment behavior </br>
@@ -405,7 +429,7 @@ species worker parent:individual schedules:shuffle(worker) {
 	 * 
 	 */
 	float get_warr_factor(characteristic wc, string value, float slope <- a, float base <- b, float decrease <- d){
-		return slope * log(wc.get_numerical_value(value) + 1) / log(base) * (tanh(-wc.get_numerical_value(value)*decrease) + #e);
+		return slope * log(wc.get_numerical_value(value) + 1) / log(base) * (tanh(-wc.get_numerical_value(value)*decrease) + base);
 	}
 	
 	// ------------------------------------
@@ -441,13 +465,12 @@ species worker parent:individual schedules:shuffle(worker) {
 				loop i from:1 to:length(mine)-1 {
 					float val <- mine[i]; float diff <- val - yours[i];
 					
-					if diff > 0 {
 						// Bound confidence
 						
 						if val=0?abs(diff)<open_to_new_ideas():abs(diff)/val<open_to_new_ideas(){
 							work_evaluator[wc][i] <- val + diff * ((1+contrast) * assim - contrast);
 						}
-					}
+					
 				}
 				if DEBUG_WORKER {ask world { do syso("BC",machine_time-t2,myself,"BC",debug_level(0));}}	
 			}
@@ -490,13 +513,14 @@ species worker parent:individual schedules:shuffle(worker) {
 	// -----------------------
 	// W-OWA
 	//
-	// see : https://github.com/sorend/fuzzy4j/blob/master/src/main/java/fuzzy4j/aggregation/weighted/WeightedOWA.java
 	
 	//float rho; // [0,1] = 1 means 'at least one', while 0 means 'everything count' 
 	float gamma <- default_gamma; // [0,1] the weights of weights
 	
 	/*
-	 * 
+	 * Weighted ordered weighted average based on implementation:
+	 * https://github.com/sorend/fuzzy4j/blob/master/src/main/java/fuzzy4j/aggregation/weighted/WeightedOWA.java
+	 *  
 	 */
 	float wowa(map<characteristic, pair<float,float>> val_weights, float andness <- rho_agg(), float ww <- gamma) {
 		
@@ -553,6 +577,13 @@ species worker parent:individual schedules:shuffle(worker) {
             }
         }
         return s;
+	}
+	
+	/*
+	 * Simple weighted average
+	 */
+	float wa(map<characteristic, pair<float,float>> val_weights) {
+		return mean(val_weights.values collect (each.key * each.value));
 	}
 	
 	// ------- //

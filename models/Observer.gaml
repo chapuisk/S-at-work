@@ -45,13 +45,13 @@ global {
 	
 	// Satisfaction equilibrium
 	reflex equilibrium {
-		ask worker { list ls <- sats[int(self)]; ls <+ _job_satisfaction; if length(ls) > windows { sats[int(self)] <- ls copy_between (1,windows+1); } }
+		ask worker { list ls <- sats[int(self)]; ls <+ _job_satisfaction; if length(ls) > observer_window { sats[int(self)] <- ls copy_between (1,observer_window+1); } }
 	}
 	
 	// stop the simulation if satisfaction does not move more than 'epsilon' in a 'windows' time frame for every agent
 	// TODO : have a end cycle in case there is no equilibria state reached
 	bool stop_sim(float epsilon <- stability_critetion, int end_cycle <- end_cycle_criterion) {
-		if cycle < windows {return false;}
+		if cycle < observer_window {return false;}
 		bool stop <- cycle = end_cycle or sats none_matches (standard_deviation(each) > epsilon * mean(each));
 			//sats none_matches (abs(min(each)-max(each))/max(each) > epsilon); 
 		if stop {
@@ -60,6 +60,7 @@ global {
 			g_index <- gender_pearson(main_observer);
 			a_index <- age_pseudo_two_lines_index(main_observer); 
 			avr_sat_batch <- mean(worker collect (each._job_satisfaction));
+			fit_batch <- main_observer.fit();
 			end_cycle_batch <- cycle;
 		}
 		return stop;
@@ -240,6 +241,33 @@ species observer {
 	 * Update outputs
 	 */
 	reflex step_outputs when:not batch_mode and every(freq) { do update_qSat; do update_aSat; do update_gSat; }
+	
+	// ------------------------------ //
+	// FITNESS
+	
+	// Implicitly reported sat is from EWCS and is 1 to 4 decreasing
+	
+	float fit {
+		
+		list<list<float>> p <- partitions(target_agents collect (each._job_satisfaction),4);
+		
+		float Q1 <- last(p[0]);
+		float Q2 <- last(p[1]);
+		float Q3 <- last(p[2]);
+		
+		int c;
+		ask target_agents {
+			switch __declared_sat {
+				match 1 { if _job_satisfaction > Q3 {c <- c+1;} }
+				match 2 { if _job_satisfaction > Q2 {c <- c+1;} }
+				match 3 { if _job_satisfaction < Q2 {c <- c+1;} }
+				match 4 { if _job_satisfaction < Q1 {c <- c+1;} }
+				default { write "variable __declared_sat has not been init"; }
+			}
+		}
+		
+		return c*1.0/length(target_agents);
+	}
 	
 	// ------------------------------ //
 	// END SIM

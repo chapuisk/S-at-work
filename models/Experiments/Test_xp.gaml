@@ -16,7 +16,8 @@ global {
 	
 	string model_source_folder <- "../";
 	bool DEBUG_MOD <- true;
-	string LEVEL <- "DEBUG";
+	//bool DEBUG_WORKER <- true;
+	string LEVEL <- debug_levels[1];
 	
 	int end_cycle_criterion <- 100;
 
@@ -45,6 +46,21 @@ global {
 				job_salary[each]*weights[SALARY]+job_time[each]*weights[WORKING_TIME]+job_contract[each]*weights[CONTRACT]
 			));
 			org.workers <+ w;
+		}
+	}
+	
+	bool peakEndMod <- true;
+	bool socCompMod <- true;
+	bool warrMod <- true;
+	bool wowaMod <- true;
+	
+	//int observer_window <- 1;
+	
+	// Can add something after global init overloading the method
+	action last_init {
+		ask worker {
+			do socio_cognitive_evaluation_of_work(__update_work_eval_criterias, __update_social_references, __nb_interactions_with_social_references);
+			_job_satisfaction <- peakEndMod ? ((peak_memory<0?_cognitive_resp:peak_memory) + _cognitive_resp) / 2 : _cognitive_resp;
 		}
 	}
 	
@@ -78,5 +94,15 @@ experiment random_xplrt type:batch repeat:10 until:world.stop_sim() {
 			}
 		}
 	}
+	
+}
+
+experiment cali parent:abstract_batch type:batch repeat:1 keep_seed:true until:world.stop_sim() {
+	
+	init { batch_mode <- true; }
+	
+	//method tabu maximize: avr_sat_batch iter_max: 10 tabu_list_size: 5;
+	method genetic pop_dim: 6 crossover_prob: 0.7 mutation_prob: 0.1 improve_sol: true stochastic_sel: true
+	nb_prelim_gen: 1 max_gen: 50  maximize: fit_batch  aggregation: "avr";
 	
 }

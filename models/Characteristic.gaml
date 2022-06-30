@@ -67,6 +67,8 @@ species characteristic virtual:true {
 	int compare_values(string val1, string val2) virtual:true;
 	// Gives back a value for a perceived valence with PERCEIVED_VALENCE range
 	string perceived_as(float valence, list frame <- PERCEPTION_VALENCE) virtual:true;
+	// Get the most representative value in a set of values
+	string overall_is(list<string> listofvalue) virtual:true;
 }
 
 // Numerical caracteristic
@@ -117,6 +119,11 @@ species num_characteristic parent:characteristic {
 		}
 		error "Perception with frame "+frame+" is not yet implemented";
 	}
+	
+	string overall_is(list<string> listofvalue) {
+		float overall <- mean(listofvalue collect (get_numerical_value(each)));
+		return string(gama_type="int" ? int(round(overall)) : overall);
+	}
 }
 
 // Ordered caracteristic
@@ -158,6 +165,12 @@ species ordered_characteristic parent:characteristic {
 		}
 		error "Perception with frame "+frame+" is not yet implemented";
 	}
+	
+	string overall_is(list<string> listofvalue) {
+		list w <- list_with(length(values),0);
+		loop v over:listofvalue { int i <- values index_of v; w[i] <- w[i] + 1; }
+		return values[w index_of max(w)];
+	}
 }
 
 // Nominal caracteristic
@@ -189,6 +202,12 @@ species nominal_characteristic parent:characteristic {
 			]);
 		}
 		error "Perception with frame "+frame+" is not yet implemented";
+	}
+	
+	string overall_is(list<string> listofvalue) {
+		list w <- list_with(length(values),0);
+		loop v over:listofvalue { int i <- values index_of v; w[i] <- w[i] + 1; }
+		return values[w index_of max(w)];
 	}
 }
 
